@@ -1,75 +1,79 @@
-"""WebSocket endpoint for streaming experiment metrics."""
+"""Room-based WebSocket connection manager for real-time streaming."""
 
 import asyncio
-import json
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
-router = APIRouter(tags=["websocket"])
+from fastapi import WebSocket
 
 
 class ConnectionManager:
-    """Manages WebSocket connections for real-time metric streaming."""
+    """Room-based WebSocket manager.
+
+    Rooms are keyed by (run_id, channel) where channel is one of:
+    'metrics', 'system', 'logs'. This allows clients to subscribe
+    to specific streams for a given run.
+    """
 
     def __init__(self) -> None:
         """Initialize connection manager."""
-        # experiment_id -> list of WebSocket connections
-        self.active_connections: dict[int, list[WebSocket]] = {}
+        # (run_id, channel) -> list of WebSocket connections
+        self._rooms: dict[tuple[int, str], list[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket, experiment_id: int) -> None:
-        """Accept and register a new WebSocket connection."""
+    async def connect(
+        self, websocket: WebSocket, run_id: int, channel: str = "metrics"
+    ) -> None:
+        """Accept and register a WebSocket to a room."""
         await websocket.accept()
-        if experiment_id not in self.active_connections:
-            self.active_connections[experiment_id] = []
-        self.active_connections[experiment_id].append(websocket)
+        key = (run_id, channel)
+        if key not in self._rooms:
+            self._rooms[key] = []
+        self._rooms[key].append(websocket)
 
-    def disconnect(self, websocket: WebSocket, experiment_id: int) -> None:
-        """Remove a WebSocket connection."""
-        if experiment_id in self.active_connections:
-            self.active_connections[experiment_id].remove(websocket)
-            if not self.active_connections[experiment_id]:
-                del self.active_connections[experiment_id]
+    def disconnect(
+        self, websocket: WebSocket, run_id: int, channel: str = "metrics"
+    ) -> None:
+        """Remove a WebSocket from a room."""
+        key = (run_id, channel)
+        if key in self._rooms:
+            try:
+                self._rooms[key].remove(websocket)
+            except ValueError:
+                pass
+            if not self._rooms[key]:
+                del self._rooms[key]
 
-    async def broadcast(self, experiment_id: int, message: dict[str, Any]) -> None:
-        """Broadcast a message to all connections for an experiment."""
-        if experiment_id not in self.active_connections:
+    async def broadcast(
+        self, run_id: int, data: dict[str, Any], channel: str = "metrics"
+    ) -> None:
+        """Send data to all clients in a room."""
+        key = (run_id, channel)
+        connections = self._rooms.get(key)
+        if not connections:
             return
 
         disconnected: list[WebSocket] = []
-        for connection in self.active_connections[experiment_id]:
+        for ws in connections:
             try:
-                await connection.send_json(message)
+                await ws.send_json(data)
             except Exception:
-                disconnected.append(connection)
+                disconnected.append(ws)
 
-        # Clean up disconnected clients
-        for websocket in disconnected:
-            self.disconnect(websocket, experiment_id)
+        for ws in disconnected:
+            self.disconnect(ws, run_id, channel)
+
+    async def send_personal(
+        self, websocket: WebSocket, data: dict[str, Any]
+    ) -> None:
+        """Send data to a single client."""
+        try:
+            await websocket.send_json(data)
+        except Exception:
+            pass
+
+    def room_count(self, run_id: int, channel: str = "metrics") -> int:
+        """Number of clients in a room."""
+        return len(self._rooms.get((run_id, channel), []))
 
 
 # Global connection manager instance
 manager = ConnectionManager()
-
-
-@router.websocket("/ws/experiments/{experiment_id}/metrics")
-async def websocket_endpoint(websocket: WebSocket, experiment_id: int) -> None:
-    """WebSocket endpoint for streaming experiment metrics in real-time."""
-    await manager.connect(websocket, experiment_id)
-    try:
-        # Keep connection alive and listen for client messages
-        while True:
-            try:
-                # Receive message from client (ping/pong or commands)
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
-
-                # Echo back for keepalive
-                if data == "ping":
-                    await websocket.send_json({"type": "pong"})
-            except asyncio.TimeoutError:
-                # Send keepalive ping
-                await websocket.send_json({"type": "keepalive"})
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, experiment_id)
-    except Exception:
-        manager.disconnect(websocket, experiment_id)
