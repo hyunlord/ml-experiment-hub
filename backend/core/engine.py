@@ -9,7 +9,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api.websocket import manager
-from backend.models.experiment import MetricRecord
+from backend.models.experiment import MetricLog
 
 
 class ExperimentEngine:
@@ -17,22 +17,22 @@ class ExperimentEngine:
 
     def __init__(self) -> None:
         """Initialize experiment engine."""
-        # experiment_id -> Process
+        # run_id -> Process
         self.running_processes: dict[int, asyncio.subprocess.Process] = {}
-        # experiment_id -> monitoring task
+        # run_id -> monitoring task
         self.monitoring_tasks: dict[int, asyncio.Task[None]] = {}
 
     async def start_experiment(
         self,
-        experiment_id: int,
+        run_id: int,
         script_path: str,
-        hyperparameters: dict[str, Any],
+        config_json: dict[str, Any],
         session: AsyncSession,
     ) -> None:
-        """Start an experiment by launching the training process."""
-        # Build command with hyperparameters
+        """Start an experiment run by launching the training process."""
+        # Build command with config parameters
         cmd = ["python", script_path]
-        for key, value in hyperparameters.items():
+        for key, value in config_json.items():
             cmd.extend([f"--{key}", str(value)])
 
         # Launch subprocess
@@ -42,20 +42,20 @@ class ExperimentEngine:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        self.running_processes[experiment_id] = process
+        self.running_processes[run_id] = process
 
         # Start monitoring task
         task = asyncio.create_task(
-            self._monitor_process(experiment_id, process, session)
+            self._monitor_process(run_id, process, session)
         )
-        self.monitoring_tasks[experiment_id] = task
+        self.monitoring_tasks[run_id] = task
 
-    async def stop_experiment(self, experiment_id: int) -> bool:
+    async def stop_experiment(self, run_id: int) -> bool:
         """Stop a running experiment."""
-        if experiment_id not in self.running_processes:
+        if run_id not in self.running_processes:
             return False
 
-        process = self.running_processes[experiment_id]
+        process = self.running_processes[run_id]
 
         # Try graceful termination first
         process.terminate()
@@ -67,20 +67,20 @@ class ExperimentEngine:
             await process.wait()
 
         # Cancel monitoring task
-        if experiment_id in self.monitoring_tasks:
-            self.monitoring_tasks[experiment_id].cancel()
+        if run_id in self.monitoring_tasks:
+            self.monitoring_tasks[run_id].cancel()
             try:
-                await self.monitoring_tasks[experiment_id]
+                await self.monitoring_tasks[run_id]
             except asyncio.CancelledError:
                 pass
-            del self.monitoring_tasks[experiment_id]
+            del self.monitoring_tasks[run_id]
 
-        del self.running_processes[experiment_id]
+        del self.running_processes[run_id]
         return True
 
     async def _monitor_process(
         self,
-        experiment_id: int,
+        run_id: int,
         process: asyncio.subprocess.Process,
         session: AsyncSession,
     ) -> None:
@@ -99,7 +99,7 @@ class ExperimentEngine:
                         if match:
                             metric_data = json.loads(match.group())
                             await self._process_metric(
-                                experiment_id, metric_data, session
+                                run_id, metric_data, session
                             )
                     except Exception:
                         # Ignore parsing errors, continue monitoring
@@ -110,10 +110,10 @@ class ExperimentEngine:
 
             # Notify completion via WebSocket
             await manager.broadcast(
-                experiment_id,
+                run_id,
                 {
-                    "type": "experiment_completed",
-                    "experiment_id": experiment_id,
+                    "type": "run_completed",
+                    "run_id": run_id,
                     "return_code": return_code,
                 },
             )
@@ -123,61 +123,62 @@ class ExperimentEngine:
         except Exception:
             # Notify error via WebSocket
             await manager.broadcast(
-                experiment_id,
+                run_id,
                 {
-                    "type": "experiment_error",
-                    "experiment_id": experiment_id,
+                    "type": "run_error",
+                    "run_id": run_id,
                 },
             )
         finally:
             # Cleanup
-            if experiment_id in self.running_processes:
-                del self.running_processes[experiment_id]
-            if experiment_id in self.monitoring_tasks:
-                del self.monitoring_tasks[experiment_id]
+            if run_id in self.running_processes:
+                del self.running_processes[run_id]
+            if run_id in self.monitoring_tasks:
+                del self.monitoring_tasks[run_id]
 
     async def _process_metric(
         self,
-        experiment_id: int,
+        run_id: int,
         metric_data: dict[str, Any],
         session: AsyncSession,
     ) -> None:
         """Process and store a parsed metric."""
         step = metric_data.get("step")
+        epoch = metric_data.get("epoch")
+
         if step is None:
             return
 
-        # Extract all numeric metrics (excluding 'step')
-        for name, value in metric_data.items():
-            if name == "step":
-                continue
-            if not isinstance(value, (int, float)):
-                continue
+        # Extract all metrics (excluding 'step' and 'epoch')
+        metrics_json = {
+            k: v
+            for k, v in metric_data.items()
+            if k not in ("step", "epoch")
+        }
 
-            # Save to database
-            metric_record = MetricRecord(
-                experiment_id=experiment_id,
-                step=step,
-                name=name,
-                value=float(value),
-                timestamp=datetime.utcnow(),
-            )
-            session.add(metric_record)
+        if not metrics_json:
+            return
 
+        # Save to database as single MetricLog entry
+        metric_log = MetricLog(
+            run_id=run_id,
+            step=step,
+            epoch=epoch,
+            metrics_json=metrics_json,
+            timestamp=datetime.utcnow(),
+        )
+        session.add(metric_log)
         await session.commit()
 
         # Broadcast to WebSocket clients
         await manager.broadcast(
-            experiment_id,
+            run_id,
             {
                 "type": "metric",
-                "experiment_id": experiment_id,
+                "run_id": run_id,
                 "step": step,
-                "metrics": {
-                    k: v
-                    for k, v in metric_data.items()
-                    if k != "step" and isinstance(v, (int, float))
-                },
+                "epoch": epoch,
+                "metrics": metrics_json,
                 "timestamp": datetime.utcnow().isoformat(),
             },
         )

@@ -5,7 +5,8 @@ from backend.schemas.experiment import (
     ExperimentListResponse,
     ExperimentResponse,
     ExperimentUpdate,
-    MetricResponse,
+    MetricLogResponse,
+    RunResponse,
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "ExperimentUpdate",
     "ExperimentResponse",
     "ExperimentListResponse",
-    "MetricResponse",
+    "RunResponse",
+    "MetricLogResponse",
 ]

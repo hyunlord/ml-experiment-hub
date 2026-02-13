@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import experiments, websocket
+from backend.api import experiments, schemas, websocket
 from backend.config import settings
 from backend.models.database import init_db
 
@@ -38,6 +38,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(experiments.router)
+app.include_router(schemas.router)
 app.include_router(websocket.router)
 
 
