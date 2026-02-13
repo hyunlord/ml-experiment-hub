@@ -1,83 +1,52 @@
-"""Base adapter interface for ML frameworks."""
+"""Base adapter interface for ML framework integration."""
 
 from abc import ABC, abstractmethod
 from typing import Any
 
-from shared.schemas import ExperimentConfig, MetricPoint
-
 
 class BaseAdapter(ABC):
-    """
-    Abstract base class for ML framework adapters.
+    """Abstract base class for ML framework adapters.
 
-    Adapters handle framework-specific logic for launching experiments,
-    collecting metrics, and managing experiment lifecycle.
+    Each adapter knows how to:
+    1. Convert a flat config dict into framework-specific YAML
+    2. Build the shell command to launch training
+    3. Parse stdout log lines into metric dicts
     """
 
     @abstractmethod
-    async def validate_config(self, config: ExperimentConfig) -> None:
-        """
-        Validate that the experiment configuration is valid for this framework.
+    def config_to_yaml(self, config: dict[str, Any]) -> str:
+        """Convert a nested config dict to framework-specific YAML content.
 
         Args:
-            config: Experiment configuration to validate
-
-        Raises:
-            ValueError: If configuration is invalid
-        """
-        pass
-
-    @abstractmethod
-    async def launch_experiment(self, experiment_id: str, config: ExperimentConfig) -> str:
-        """
-        Launch an experiment with the given configuration.
-
-        Args:
-            experiment_id: Unique identifier for this experiment
-            config: Experiment configuration
+            config: Nested config dict (already unflattened from dot-notation).
 
         Returns:
-            Process ID or job ID for the launched experiment
-
-        Raises:
-            RuntimeError: If experiment fails to launch
+            YAML string ready to write to a file.
         """
-        pass
 
     @abstractmethod
-    async def stop_experiment(self, process_id: str) -> None:
-        """
-        Stop a running experiment.
+    def get_train_command(self, yaml_path: str) -> list[str]:
+        """Build the command to launch a training process.
 
         Args:
-            process_id: Process or job ID returned by launch_experiment
-
-        Raises:
-            RuntimeError: If experiment cannot be stopped
-        """
-        pass
-
-    @abstractmethod
-    async def get_metrics(self, experiment_id: str) -> list[MetricPoint]:
-        """
-        Retrieve metrics for an experiment.
-
-        Args:
-            experiment_id: Unique identifier for the experiment
+            yaml_path: Path to the generated YAML config file.
 
         Returns:
-            List of metric measurements
-
-        Raises:
-            RuntimeError: If metrics cannot be retrieved
+            Command as a list of strings (for subprocess).
         """
-        pass
 
-    async def cleanup(self, experiment_id: str) -> None:
-        """
-        Clean up resources after experiment completion (optional).
+    @abstractmethod
+    def parse_metrics(self, log_line: str) -> dict[str, Any] | None:
+        """Try to parse a stdout line into a metrics dict.
 
         Args:
-            experiment_id: Unique identifier for the experiment
+            log_line: A single line of stdout from the training process.
+
+        Returns:
+            Dict with at least 'step' key and metric values, or None
+            if the line doesn't contain metrics.
         """
-        pass
+
+    def get_name(self) -> str:
+        """Return human-readable adapter name."""
+        return self.__class__.__name__

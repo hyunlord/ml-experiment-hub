@@ -1,99 +1,48 @@
 """PyTorch Lightning adapter for experiment execution."""
 
-from shared.schemas import ExperimentConfig, MetricPoint
+import json
+import re
+from typing import Any
+
+import yaml
 
 from adapters.base import BaseAdapter
 
 
 class PyTorchLightningAdapter(BaseAdapter):
+    """Adapter for PyTorch Lightning / custom train.py scripts.
+
+    Designed for projects like vlm_quantization where the training script
+    accepts a --config YAML file and prints JSON metrics to stdout.
     """
-    Adapter for PyTorch Lightning experiments.
 
-    Handles launching, monitoring, and stopping PyTorch Lightning training jobs.
-    """
+    def config_to_yaml(self, config: dict[str, Any]) -> str:
+        """Convert nested config dict to YAML for train.py --config."""
+        return yaml.dump(config, default_flow_style=False, allow_unicode=True)
 
-    async def validate_config(self, config: ExperimentConfig) -> None:
+    def get_train_command(self, yaml_path: str) -> list[str]:
+        """Build: python train.py --config <yaml_path>."""
+        return ["python", "train.py", "--config", yaml_path]
+
+    def parse_metrics(self, log_line: str) -> dict[str, Any] | None:
+        """Parse JSON metric lines from stdout.
+
+        Expected format:
+            {"step": 100, "epoch": 1, "train/loss": 0.5, "val/map": 0.8}
+
+        Also handles prefixed lines like:
+            [METRICS] {"step": 100, ...}
         """
-        Validate PyTorch Lightning experiment configuration.
+        # Try to find JSON with "step" key
+        match = re.search(r'\{[^{}]*"step"\s*:\s*\d+[^{}]*\}', log_line)
+        if not match:
+            return None
 
-        Args:
-            config: Experiment configuration to validate
+        try:
+            data = json.loads(match.group())
+            if isinstance(data, dict) and "step" in data:
+                return data
+        except (json.JSONDecodeError, TypeError):
+            pass
 
-        Raises:
-            ValueError: If configuration is invalid
-        """
-        # TODO: Implement validation logic
-        # - Check script_path exists and is executable
-        # - Validate hyperparameters contain required fields
-        # - Verify PyTorch Lightning is installed
-        if not config.script_path:
-            raise ValueError("script_path is required for PyTorch Lightning experiments")
-
-    async def launch_experiment(self, experiment_id: str, config: ExperimentConfig) -> str:
-        """
-        Launch a PyTorch Lightning experiment.
-
-        Args:
-            experiment_id: Unique identifier for this experiment
-            config: Experiment configuration
-
-        Returns:
-            Process ID for the launched training job
-
-        Raises:
-            RuntimeError: If experiment fails to launch
-        """
-        # TODO: Implement launcher logic
-        # - Set up logging callbacks
-        # - Configure checkpoint directory
-        # - Launch subprocess with hyperparameters
-        # - Set up metric collection hooks
-        raise NotImplementedError("PyTorch Lightning launcher coming soon")
-
-    async def stop_experiment(self, process_id: str) -> None:
-        """
-        Stop a running PyTorch Lightning experiment.
-
-        Args:
-            process_id: Process ID returned by launch_experiment
-
-        Raises:
-            RuntimeError: If experiment cannot be stopped
-        """
-        # TODO: Implement stop logic
-        # - Send SIGTERM to process
-        # - Wait for graceful shutdown
-        # - Force kill if necessary
-        raise NotImplementedError("PyTorch Lightning stop coming soon")
-
-    async def get_metrics(self, experiment_id: str) -> list[MetricPoint]:
-        """
-        Retrieve metrics from a PyTorch Lightning experiment.
-
-        Args:
-            experiment_id: Unique identifier for the experiment
-
-        Returns:
-            List of metric measurements
-
-        Raises:
-            RuntimeError: If metrics cannot be retrieved
-        """
-        # TODO: Implement metric collection
-        # - Parse TensorBoard logs
-        # - Read from checkpoint metadata
-        # - Convert to MetricPoint format
-        return []
-
-    async def cleanup(self, experiment_id: str) -> None:
-        """
-        Clean up PyTorch Lightning experiment resources.
-
-        Args:
-            experiment_id: Unique identifier for the experiment
-        """
-        # TODO: Implement cleanup
-        # - Remove temporary files
-        # - Archive checkpoints
-        # - Clear GPU memory
-        pass
+        return None

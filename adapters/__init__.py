@@ -12,17 +12,16 @@ ADAPTER_REGISTRY: dict[str, type[BaseAdapter]] = {
 
 
 def get_adapter(framework: str) -> BaseAdapter:
-    """
-    Get an adapter instance for the specified framework.
+    """Get an adapter instance for the specified framework.
 
     Args:
-        framework: Name of the ML framework
+        framework: Name of the ML framework.
 
     Returns:
-        Instantiated adapter for the framework
+        Instantiated adapter for the framework.
 
     Raises:
-        ValueError: If framework is not supported
+        ValueError: If framework is not supported.
     """
     adapter_class = ADAPTER_REGISTRY.get(framework)
     if adapter_class is None:
