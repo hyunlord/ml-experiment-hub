@@ -6,10 +6,14 @@ from shared.schemas import (
     RunStatus,
     SystemStatsPoint,
 )
+from shared.utils import diff_configs, flatten_dict, unflatten_dict
 
 __all__ = [
     "ExperimentConfigStatus",
     "MetricPoint",
     "RunStatus",
     "SystemStatsPoint",
+    "diff_configs",
+    "flatten_dict",
+    "unflatten_dict",
 ]

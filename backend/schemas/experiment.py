@@ -13,17 +13,17 @@ class ExperimentCreate(BaseModel):
 
     name: str = Field(min_length=1)
     description: str = Field(default="")
-    config_json: dict[str, Any] = Field(default_factory=dict)
-    config_schema_id: int | None = None
+    config: dict[str, Any] = Field(default_factory=dict)
+    schema_id: int | None = Field(default=None)
     tags: list[str] = Field(default_factory=list)
 
 
 class ExperimentUpdate(BaseModel):
-    """Schema for updating an experiment configuration."""
+    """Schema for updating an experiment configuration (draft only)."""
 
     name: str | None = None
     description: str | None = None
-    config_json: dict[str, Any] | None = None
+    config: dict[str, Any] | None = None
     tags: list[str] | None = None
 
 
@@ -34,8 +34,8 @@ class ExperimentResponse(BaseModel):
     name: str
     description: str
     status: ExperimentConfigStatus
-    config_json: dict[str, Any]
-    config_schema_id: int | None
+    config: dict[str, Any]
+    schema_id: int | None
     tags: list[str]
     created_at: datetime
     updated_at: datetime
@@ -45,12 +45,41 @@ class ExperimentResponse(BaseModel):
 
         from_attributes = True
 
+    @classmethod
+    def from_model(cls, model: Any) -> "ExperimentResponse":
+        """Create response from DB model, mapping field names."""
+        return cls(
+            id=model.id,
+            name=model.name,
+            description=model.description,
+            status=model.status,
+            config=model.config_json,
+            schema_id=model.config_schema_id,
+            tags=model.tags,
+            created_at=model.created_at,
+            updated_at=model.updated_at,
+        )
+
 
 class ExperimentListResponse(BaseModel):
     """Schema for experiment list response."""
 
     experiments: list[ExperimentResponse]
     total: int
+
+
+class ExperimentDiffRequest(BaseModel):
+    """Request schema for comparing two experiment configs."""
+
+    compare_with: int
+
+
+class ExperimentDiffResponse(BaseModel):
+    """Response schema for config diff between two experiments."""
+
+    added: dict[str, Any] = Field(default_factory=dict)
+    removed: dict[str, Any] = Field(default_factory=dict)
+    changed: dict[str, Any] = Field(default_factory=dict)
 
 
 class RunResponse(BaseModel):

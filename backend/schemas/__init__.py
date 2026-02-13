@@ -2,6 +2,8 @@
 
 from backend.schemas.experiment import (
     ExperimentCreate,
+    ExperimentDiffRequest,
+    ExperimentDiffResponse,
     ExperimentListResponse,
     ExperimentResponse,
     ExperimentUpdate,
@@ -14,6 +16,8 @@ __all__ = [
     "ExperimentUpdate",
     "ExperimentResponse",
     "ExperimentListResponse",
+    "ExperimentDiffRequest",
+    "ExperimentDiffResponse",
     "RunResponse",
     "MetricLogResponse",
 ]
