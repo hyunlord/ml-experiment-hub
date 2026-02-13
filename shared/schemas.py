@@ -1,4 +1,4 @@
-"""Shared Pydantic schemas for ML Experiment Hub."""
+"""Shared Pydantic schemas and enums for ML Experiment Hub."""
 
 from datetime import datetime
 from enum import Enum
@@ -7,50 +7,43 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
-class ExperimentStatus(str, Enum):
-    """Status of an experiment."""
+class ExperimentConfigStatus(str, Enum):
+    """Status of an experiment configuration."""
 
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
+    DRAFT = "draft"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class RunStatus(str, Enum):
+    """Status of an experiment run."""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 class MetricPoint(BaseModel):
-    """A single metric measurement at a specific point in time."""
+    """A single metric log entry with free-form key-value metrics."""
 
-    timestamp: datetime = Field(description="When the metric was recorded")
     step: int = Field(ge=0, description="Training step number")
-    name: str = Field(min_length=1, description="Name of the metric (e.g., 'loss', 'accuracy')")
-    value: float = Field(description="Value of the metric")
-
-
-class ExperimentConfig(BaseModel):
-    """Configuration for launching an ML experiment."""
-
-    name: str = Field(min_length=1, description="Human-readable experiment name")
-    description: str = Field(default="", description="Optional experiment description")
-    framework: str = Field(
-        min_length=1,
-        description="ML framework (e.g., 'pytorch_lightning', 'huggingface')",
+    epoch: int | None = Field(default=None, ge=0, description="Epoch number")
+    timestamp: datetime = Field(description="When the metrics were recorded")
+    metrics_json: dict[str, Any] = Field(
+        description="Free-form metrics (e.g. {'train/loss': 0.5, 'val/map': 0.8})"
     )
-    script_path: str = Field(min_length=1, description="Path to the training script")
-    hyperparameters: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Hyperparameters for the experiment",
-    )
-    tags: list[str] = Field(default_factory=list, description="Tags for categorizing experiments")
 
 
-class ExperimentResult(BaseModel):
-    """Result data from a completed or running experiment."""
+class SystemStatsPoint(BaseModel):
+    """System resource utilization snapshot."""
 
-    experiment_id: str = Field(min_length=1, description="Unique identifier for the experiment")
-    status: ExperimentStatus = Field(description="Current status of the experiment")
-    metrics: list[MetricPoint] = Field(
-        default_factory=list,
-        description="List of metric measurements",
-    )
-    start_time: datetime = Field(description="When the experiment started")
-    end_time: datetime | None = Field(default=None, description="When the experiment ended")
+    timestamp: datetime
+    gpu_util: float | None = None
+    gpu_memory_used: float | None = None
+    gpu_memory_total: float | None = None
+    cpu_percent: float | None = None
+    ram_percent: float | None = None

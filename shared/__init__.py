@@ -1,15 +1,15 @@
 """Shared schemas and utilities for ML Experiment Hub."""
 
 from shared.schemas import (
-    ExperimentConfig,
-    ExperimentResult,
-    ExperimentStatus,
+    ExperimentConfigStatus,
     MetricPoint,
+    RunStatus,
+    SystemStatsPoint,
 )
 
 __all__ = [
-    "ExperimentConfig",
-    "ExperimentResult",
-    "ExperimentStatus",
+    "ExperimentConfigStatus",
     "MetricPoint",
+    "RunStatus",
+    "SystemStatsPoint",
 ]
