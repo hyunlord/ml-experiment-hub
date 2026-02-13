@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  # PostgreSQL service - currently commented out, using SQLite for development
+  # Uncomment for production use
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: ml-hub-postgres
+  #   environment:
+  #     POSTGRES_USER: mlhub
+  #     POSTGRES_PASSWORD: changeme
+  #     POSTGRES_DB: ml_experiments
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U mlhub"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+# Uncomment volumes when enabling PostgreSQL
+# volumes:
+#   postgres_data:
