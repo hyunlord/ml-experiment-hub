@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Plus, Filter } from 'lucide-react'
 import { useExperimentStore } from '@/stores/experimentStore'
 import ExperimentCard from '@/components/ExperimentCard'
-import CreateExperimentDialog from '@/components/CreateExperimentDialog'
 import { ExperimentStatus } from '@/types/experiment'
 
 export default function ExperimentsPage() {
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
   const { experiments, loading, fetchExperiments } = useExperimentStore()
@@ -25,7 +25,7 @@ export default function ExperimentsPage() {
           </p>
         </div>
         <button
-          onClick={() => setDialogOpen(true)}
+          onClick={() => navigate('/experiments/new')}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         >
           <Plus className="h-4 w-4" />
@@ -62,7 +62,7 @@ export default function ExperimentsPage() {
             Create your first experiment to get started
           </p>
           <button
-            onClick={() => setDialogOpen(true)}
+            onClick={() => navigate('/experiments/new')}
             className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             <Plus className="h-4 w-4" />
@@ -77,10 +77,6 @@ export default function ExperimentsPage() {
         </div>
       )}
 
-      <CreateExperimentDialog
-        open={dialogOpen}
-        onClose={() => setDialogOpen(false)}
-      />
     </div>
   )
 }
