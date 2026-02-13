@@ -41,7 +41,8 @@ export default function ExperimentsPage() {
           className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="all">All Status</option>
-          <option value={ExperimentStatus.PENDING}>Pending</option>
+          <option value={ExperimentStatus.DRAFT}>Draft</option>
+          <option value={ExperimentStatus.QUEUED}>Queued</option>
           <option value={ExperimentStatus.RUNNING}>Running</option>
           <option value={ExperimentStatus.COMPLETED}>Completed</option>
           <option value={ExperimentStatus.FAILED}>Failed</option>

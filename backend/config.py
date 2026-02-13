@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
     LOG_LEVEL: str = "INFO"
     EXPERIMENT_DIR: str = "./experiments"
+    PROJECTS_DIR: str = "./projects"
+    CHECKPOINT_BASE_DIR: str = "./checkpoints"
+    LOG_DIR: str = "./logs"
+    DATA_DIR: str = "./data"
+    CONFIG_DIR: str = ""  # temp config YAML dir; empty = system tempdir
+    VENVS_DIR: str = "/data/venvs"  # per-project Python venv storage
 
     class Config:
         """Pydantic configuration."""

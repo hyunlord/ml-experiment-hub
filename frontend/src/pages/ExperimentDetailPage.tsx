@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Play, Square, Trash2 } from 'lucide-react'
+import { ArrowLeft, Play, Square, Trash2, Copy } from 'lucide-react'
 import { useExperimentStore } from '@/stores/experimentStore'
-import { useWebSocket } from '@/hooks/useWebSocket'
 import StatusBadge from '@/components/StatusBadge'
 import MetricsChart from '@/components/MetricsChart'
 import { ExperimentStatus } from '@/types/experiment'
@@ -13,49 +12,39 @@ export default function ExperimentDetailPage() {
 
   const {
     selectedExperiment,
+    runs,
     metrics,
     loading,
     fetchExperiment,
-    fetchMetrics,
-    startExperiment,
-    stopExperiment,
+    fetchRuns,
+    startRun,
+    stopRun,
     deleteExperiment,
-    addMetricPoint,
+    cloneExperiment,
     clearMetrics,
   } = useExperimentStore()
-
-  const wsUrl = id
-    ? `ws://localhost:8000/ws/experiments/${id}/metrics`
-    : null
-
-  const { messages, isConnected } = useWebSocket(wsUrl)
 
   useEffect(() => {
     if (id) {
       fetchExperiment(id)
-      fetchMetrics(id)
+      fetchRuns(id)
     }
     return () => {
       clearMetrics()
     }
-  }, [id, fetchExperiment, fetchMetrics, clearMetrics])
+  }, [id, fetchExperiment, fetchRuns, clearMetrics])
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1] as unknown
-      addMetricPoint(lastMessage as never)
-    }
-  }, [messages, addMetricPoint])
+  const latestRun = runs.length > 0 ? runs[runs.length - 1] : null
 
   const handleStart = async () => {
     if (id) {
-      await startExperiment(id)
+      await startRun(id)
     }
   }
 
   const handleStop = async () => {
-    if (id) {
-      await stopExperiment(id)
+    if (latestRun) {
+      await stopRun(latestRun.id)
     }
   }
 
@@ -63,6 +52,13 @@ export default function ExperimentDetailPage() {
     if (id && confirm('Are you sure you want to delete this experiment?')) {
       await deleteExperiment(id)
       navigate('/')
+    }
+  }
+
+  const handleClone = async () => {
+    if (id) {
+      const clone = await cloneExperiment(id)
+      navigate(`/experiments/${clone.id}`)
     }
   }
 
@@ -83,9 +79,10 @@ export default function ExperimentDetailPage() {
   }
 
   const canStart =
-    selectedExperiment.status === ExperimentStatus.PENDING ||
+    selectedExperiment.status === ExperimentStatus.DRAFT ||
+    selectedExperiment.status === ExperimentStatus.QUEUED ||
     selectedExperiment.status === ExperimentStatus.CANCELLED
-  const canStop = selectedExperiment.status === ExperimentStatus.RUNNING
+  const canStop = latestRun?.status === 'running'
 
   return (
     <div>
@@ -109,20 +106,15 @@ export default function ExperimentDetailPage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={selectedExperiment.status} />
-            {isConnected && (
-              <span className="flex h-2 w-2 rounded-full bg-green-500" />
-            )}
-          </div>
+          <StatusBadge status={selectedExperiment.status} />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-              Framework
+              Status
             </h3>
-            <p className="text-card-foreground">{selectedExperiment.framework}</p>
+            <p className="uppercase text-card-foreground">{selectedExperiment.status}</p>
           </div>
           <div>
             <h3 className="mb-2 text-sm font-medium text-muted-foreground">
@@ -132,34 +124,28 @@ export default function ExperimentDetailPage() {
               {new Date(selectedExperiment.created_at).toLocaleString()}
             </p>
           </div>
-          {selectedExperiment.started_at && (
+          {selectedExperiment.tags.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-                Started
+                Tags
               </h3>
-              <p className="text-card-foreground">
-                {new Date(selectedExperiment.started_at).toLocaleString()}
-              </p>
-            </div>
-          )}
-          {selectedExperiment.completed_at && (
-            <div>
-              <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-                Completed
-              </h3>
-              <p className="text-card-foreground">
-                {new Date(selectedExperiment.completed_at).toLocaleString()}
-              </p>
+              <div className="flex flex-wrap gap-1">
+                {selectedExperiment.tags.map((tag) => (
+                  <span key={tag} className="rounded bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>
 
         <div className="mt-4">
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
-            Hyperparameters
+            Configuration
           </h3>
-          <pre className="rounded-md bg-secondary p-3 text-sm">
-            {JSON.stringify(selectedExperiment.hyperparameters, null, 2)}
+          <pre className="rounded-md bg-secondary p-3 text-sm overflow-x-auto">
+            {JSON.stringify(selectedExperiment.config, null, 2)}
           </pre>
         </div>
 
@@ -171,7 +157,7 @@ export default function ExperimentDetailPage() {
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             >
               <Play className="h-4 w-4" />
-              Start
+              Start Training
             </button>
           )}
           {canStop && (
@@ -185,6 +171,14 @@ export default function ExperimentDetailPage() {
             </button>
           )}
           <button
+            onClick={handleClone}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            <Copy className="h-4 w-4" />
+            Clone
+          </button>
+          <button
             onClick={handleDelete}
             disabled={loading}
             className="flex items-center gap-2 rounded-md border border-destructive bg-background px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive hover:text-destructive-foreground disabled:opacity-50"
@@ -195,49 +189,36 @@ export default function ExperimentDetailPage() {
         </div>
       </div>
 
-      <MetricsChart metrics={metrics} />
-
-      {metrics.length > 0 && (
-        <div className="mt-6 rounded-lg border border-border bg-card p-6">
+      {/* Runs list */}
+      {runs.length > 0 && (
+        <div className="mb-6 rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 text-lg font-semibold text-card-foreground">
-            Metrics Data
+            Runs
           </h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-2 text-left font-medium text-muted-foreground">
-                    Step
-                  </th>
-                  <th className="pb-2 text-left font-medium text-muted-foreground">
-                    Name
-                  </th>
-                  <th className="pb-2 text-left font-medium text-muted-foreground">
-                    Value
-                  </th>
-                  <th className="pb-2 text-left font-medium text-muted-foreground">
-                    Timestamp
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.slice(-20).reverse().map((metric) => (
-                  <tr key={metric.id} className="border-b border-border">
-                    <td className="py-2 text-card-foreground">{metric.step}</td>
-                    <td className="py-2 text-card-foreground">{metric.name}</td>
-                    <td className="py-2 text-card-foreground">
-                      {metric.value.toFixed(4)}
-                    </td>
-                    <td className="py-2 text-muted-foreground">
-                      {new Date(metric.timestamp).toLocaleTimeString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-2">
+            {runs.map((run) => (
+              <div key={run.id} className="flex items-center justify-between rounded-md border border-border px-4 py-2 text-sm">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-muted-foreground">#{run.id}</span>
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold uppercase ${
+                    run.status === 'running' ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' :
+                    run.status === 'completed' ? 'bg-green-500/20 text-green-300 border-green-500/30' :
+                    run.status === 'failed' ? 'bg-red-500/20 text-red-300 border-red-500/30' :
+                    'bg-orange-500/20 text-orange-300 border-orange-500/30'
+                  }`}>
+                    {run.status}
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {run.started_at ? new Date(run.started_at).toLocaleString() : ''}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
+
+      <MetricsChart metrics={metrics} />
     </div>
   )
 }

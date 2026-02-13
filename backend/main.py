@@ -1,12 +1,12 @@
 """FastAPI application entry point for ML Experiment Hub."""
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import experiments, metrics, schemas
+from backend.api import compat, datasets, experiments, metrics, runs, schemas, system
 from backend.config import settings
 from backend.models.database import init_db
 
@@ -16,6 +16,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown."""
     # Startup: Initialize database
     await init_db()
+
+    # Clean up stale runs from previous server session
+    from datetime import datetime
+
+    from sqlmodel import select
+
+    from backend.models.database import async_session_maker
+    from backend.models.experiment import ExperimentRun
+    from shared.schemas import RunStatus
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(ExperimentRun).where(ExperimentRun.status == RunStatus.RUNNING)
+        )
+        stale_runs = result.scalars().all()
+        if stale_runs:
+            for run in stale_runs:
+                run.status = RunStatus.FAILED
+                run.ended_at = datetime.utcnow()
+            await session.commit()
+            import logging
+            logging.getLogger(__name__).warning(
+                "Cleaned up %d stale RUNNING runs from previous server session",
+                len(stale_runs),
+            )
+
     yield
     # Shutdown: cleanup if needed
 
@@ -40,6 +66,10 @@ app.add_middleware(
 app.include_router(experiments.router)
 app.include_router(schemas.router)
 app.include_router(metrics.router)
+app.include_router(runs.router)
+app.include_router(compat.router)
+app.include_router(datasets.router)
+app.include_router(system.router)
 
 
 @app.get("/")

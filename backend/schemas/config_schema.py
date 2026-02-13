@@ -24,6 +24,7 @@ class SelectOption(BaseModel):
 
     value: str
     label: str
+    description: str = ""
 
 
 class SchemaFieldDefinition(BaseModel):
@@ -53,6 +54,12 @@ class SchemaFieldDefinition(BaseModel):
     options: list[str] | list[SelectOption] | None = Field(
         default=None,
         description="Options for select/multi-select fields",
+    )
+
+    # Dependency hints for conditional UI behavior
+    depends_on: dict[str, Any] | None = Field(
+        default=None,
+        description="Dependency hint: {field, condition, effect, hint}",
     )
 
     @model_validator(mode="after")

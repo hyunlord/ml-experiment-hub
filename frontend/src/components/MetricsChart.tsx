@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import type { MetricPoint } from '@/types/experiment'
+import type { MetricLog } from '@/types/experiment'
 
 interface MetricsChartProps {
-  metrics: MetricPoint[]
+  metrics: MetricLog[]
 }
 
 export default function MetricsChart({ metrics }: MetricsChartProps) {
@@ -15,23 +15,26 @@ export default function MetricsChart({ metrics }: MetricsChartProps) {
     )
   }
 
-  // Group flat MetricPoint records into chart-friendly format: { step, loss, accuracy, ... }
   const { chartData, metricNames } = useMemo(() => {
     const stepMap = new Map<number, Record<string, number>>()
     const names = new Set<string>()
 
-    for (const point of metrics) {
-      names.add(point.name)
-      const existing = stepMap.get(point.step) ?? { step: point.step }
-      existing[point.name] = point.value
-      stepMap.set(point.step, existing)
+    for (const entry of metrics) {
+      const existing = stepMap.get(entry.step) ?? { step: entry.step }
+      for (const [key, val] of Object.entries(entry.metrics_json)) {
+        if (typeof val === 'number') {
+          names.add(key)
+          existing[key] = val
+        }
+      }
+      stepMap.set(entry.step, existing)
     }
 
     const sorted = Array.from(stepMap.values()).sort((a, b) => a.step - b.step)
     return { chartData: sorted, metricNames: Array.from(names) }
   }, [metrics])
 
-  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">

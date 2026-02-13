@@ -21,6 +21,7 @@ from adapters import get_adapter
 from adapters.base import BaseAdapter
 from backend.api.websocket import manager as ws_manager
 from backend.config import settings
+from backend.core.env_manager import env_manager
 from backend.models.experiment import ExperimentConfig, ExperimentRun, MetricLog
 from shared.schemas import ExperimentConfigStatus, RunStatus
 from shared.utils import unflatten_dict
@@ -50,8 +51,13 @@ class ExperimentRunner:
         self._config_files: dict[int, str] = {}
 
         # Ensure log directory exists
-        self._log_dir = Path(settings.EXPERIMENT_DIR) / "logs"
+        self._log_dir = Path(settings.LOG_DIR)
         self._log_dir.mkdir(parents=True, exist_ok=True)
+
+        # Config YAML output directory (empty = system tempdir)
+        self._config_dir = Path(settings.CONFIG_DIR) if settings.CONFIG_DIR else None
+        if self._config_dir:
+            self._config_dir.mkdir(parents=True, exist_ok=True)
 
     async def start(
         self,
@@ -98,13 +104,27 @@ class ExperimentRunner:
         # Get adapter
         adapter = get_adapter(adapter_name)
 
+        # Set up project venv (creates/updates if needed)
+        project_dir = str(Path(settings.PROJECTS_DIR))
+        try:
+            await env_manager.setup_project(project_dir)
+        except FileNotFoundError:
+            logger.warning(
+                "No dependency files found for project at %s, using system Python",
+                project_dir,
+            )
+        except RuntimeError as e:
+            raise ValueError(f"Failed to set up project environment: {e}") from e
+
         # Convert flat dot-notation config → nested dict → YAML
         nested_config = unflatten_dict(experiment.config_json or {})
         yaml_content = adapter.config_to_yaml(nested_config)
 
         # Write temp YAML config file
         config_fd, config_path = tempfile.mkstemp(
-            prefix=f"exp_{experiment_id}_", suffix=".yaml"
+            prefix=f"exp_{experiment_id}_",
+            suffix=".yaml",
+            dir=str(self._config_dir) if self._config_dir else None,
         )
         with os.fdopen(config_fd, "w") as f:
             f.write(yaml_content)
@@ -130,6 +150,12 @@ class ExperimentRunner:
 
         # Build and launch training command
         cmd = adapter.get_train_command(config_path)
+
+        # Use project venv Python if available
+        project_dir = str(Path(settings.PROJECTS_DIR))
+        if env_manager.is_ready(project_dir) and cmd and cmd[0] == "python":
+            cmd[0] = env_manager.get_python(project_dir)
+
         logger.info("Starting run %d: %s", run.id, " ".join(cmd))
 
         try:
@@ -137,7 +163,7 @@ class ExperimentRunner:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=log_file,
-                cwd=settings.EXPERIMENT_DIR,
+                cwd=settings.PROJECTS_DIR,
             )
         except Exception as e:
             # Cleanup on launch failure

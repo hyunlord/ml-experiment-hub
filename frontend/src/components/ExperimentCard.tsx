@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { Experiment } from '@/types/experiment'
 import StatusBadge from './StatusBadge'
-import { Clock, Calendar } from 'lucide-react'
+import { Calendar } from 'lucide-react'
 
 interface ExperimentCardProps {
   experiment: Experiment
@@ -27,23 +27,21 @@ export default function ExperimentCard({ experiment }: ExperimentCardProps) {
         <StatusBadge status={experiment.status} />
       </div>
       <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-        <span className="rounded bg-secondary px-2 py-1 text-secondary-foreground">
-          {experiment.framework}
-        </span>
+        {experiment.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {experiment.tags.map((tag) => (
+              <span key={tag} className="rounded bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-1">
           <Calendar className="h-4 w-4" />
           <span>
             {new Date(experiment.created_at).toLocaleDateString()}
           </span>
         </div>
-        {experiment.started_at && (
-          <div className="flex items-center gap-1">
-            <Clock className="h-4 w-4" />
-            <span>
-              {new Date(experiment.started_at).toLocaleTimeString()}
-            </span>
-          </div>
-        )}
       </div>
     </Link>
   )

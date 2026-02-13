@@ -1,25 +1,61 @@
-version: '3.8'
+# =============================================================================
+# ML Experiment Hub - Production Docker Compose
+# Target: DGX Spark (Ubuntu + NVIDIA GPU)
+# Usage: docker compose up -d
+# =============================================================================
 
 services:
-  # PostgreSQL service - currently commented out, using SQLite for development
-  # Uncomment for production use
-  # postgres:
-  #   image: postgres:16-alpine
-  #   container_name: ml-hub-postgres
-  #   environment:
-  #     POSTGRES_USER: mlhub
-  #     POSTGRES_PASSWORD: changeme
-  #     POSTGRES_DB: ml_experiments
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U mlhub"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: prod
+    container_name: ml-hub-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data                              # DB + logs (persistent)
+      - ${PROJECTS_DIR:-./_projects}:/projects:ro  # ML project code (read-only)
+      - ${DATA_DIR:-./_data}:/ml-data:ro           # Training data (COCO etc, read-only)
+      - ${CHECKPOINT_DIR:-./_checkpoints}:/checkpoints  # Checkpoints (read/write)
+      - /tmp/ml-hub-configs:/tmp/configs           # Generated config YAMLs
+      - ml-venvs:/data/venvs                      # Per-project Python venvs (persistent)
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////data/ml_hub.db
+      - PROJECTS_DIR=/projects
+      - DATA_DIR=/ml-data
+      - CHECKPOINT_BASE_DIR=/checkpoints
+      - LOG_DIR=/data/logs
+      - CONFIG_DIR=/tmp/configs
+      - VENVS_DIR=/data/venvs
+      - CORS_ORIGINS=["http://localhost:3000"]
+      - LOG_LEVEL=INFO
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-# Uncomment volumes when enabling PostgreSQL
-# volumes:
-#   postgres_data:
+  frontend:
+    build:
+      context: ./frontend
+      target: prod
+    container_name: ml-hub-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ml-venvs:

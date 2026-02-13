@@ -10,9 +10,8 @@ interface CreateExperimentDialogProps {
 export default function CreateExperimentDialog({ open, onClose }: CreateExperimentDialogProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [framework, setFramework] = useState('pytorch_lightning')
-  const [scriptPath, setScriptPath] = useState('')
-  const [hyperparameters, setHyperparameters] = useState('{}')
+  const [tags, setTags] = useState('')
+  const [config, setConfig] = useState('{}')
   const [error, setError] = useState('')
 
   const createExperiment = useExperimentStore((state) => state.createExperiment)
@@ -22,22 +21,21 @@ export default function CreateExperimentDialog({ open, onClose }: CreateExperime
     setError('')
 
     try {
-      const params = JSON.parse(hyperparameters)
+      const configObj = JSON.parse(config)
+      const tagArray = tags.split(',').map(t => t.trim()).filter(Boolean)
       await createExperiment({
         name,
         description: description || undefined,
-        framework,
-        script_path: scriptPath,
-        hyperparameters: params,
+        config: configObj,
+        tags: tagArray.length > 0 ? tagArray : undefined,
       })
       setName('')
       setDescription('')
-      setFramework('pytorch_lightning')
-      setScriptPath('')
-      setHyperparameters('{}')
+      setTags('')
+      setConfig('{}')
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid hyperparameters JSON')
+      setError(err instanceof Error ? err.message : 'Invalid configuration JSON')
     }
   }
 
@@ -86,43 +84,27 @@ export default function CreateExperimentDialog({ open, onClose }: CreateExperime
 
           <div>
             <label className="mb-2 block text-sm font-medium text-card-foreground">
-              Framework
-            </label>
-            <select
-              value={framework}
-              onChange={(e) => setFramework(e.target.value)}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="pytorch_lightning">PyTorch Lightning</option>
-              <option value="huggingface">HuggingFace</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-card-foreground">
-              Script Path
+              Tags (comma-separated)
             </label>
             <input
               type="text"
-              value={scriptPath}
-              onChange={(e) => setScriptPath(e.target.value)}
-              required
-              placeholder="path/to/train.py"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="pytorch, vision, resnet"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
           <div>
             <label className="mb-2 block text-sm font-medium text-card-foreground">
-              Hyperparameters (JSON)
+              Configuration (JSON)
             </label>
             <textarea
-              value={hyperparameters}
-              onChange={(e) => setHyperparameters(e.target.value)}
-              rows={4}
+              value={config}
+              onChange={(e) => setConfig(e.target.value)}
+              rows={6}
               className="w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder='{"learning_rate": 0.001, "batch_size": 32}'
+              placeholder='{"learning_rate": 0.001, "batch_size": 32, "epochs": 10}'
             />
           </div>
 

@@ -1,29 +1,34 @@
 import { create } from 'zustand'
-import type { Experiment, MetricPoint } from '@/types/experiment'
+import type { Experiment, ExperimentRun, MetricLog } from '@/types/experiment'
+import { RunStatus } from '@/types/experiment'
 import * as api from '@/api/experiments'
 
 interface ExperimentStore {
   experiments: Experiment[]
   selectedExperiment: Experiment | null
-  metrics: MetricPoint[]
+  runs: ExperimentRun[]
+  metrics: MetricLog[]
   loading: boolean
   error: string | null
 
   fetchExperiments: (params?: { skip?: number; limit?: number; status?: string }) => Promise<void>
-  fetchExperiment: (id: string) => Promise<void>
-  createExperiment: (data: { name: string; description?: string; framework: string; script_path: string; hyperparameters: Record<string, unknown> }) => Promise<Experiment>
-  updateExperiment: (id: string, data: Partial<{ name: string; description?: string; framework: string; hyperparameters: Record<string, unknown> }>) => Promise<void>
-  deleteExperiment: (id: string) => Promise<void>
-  startExperiment: (id: string) => Promise<void>
-  stopExperiment: (id: string) => Promise<void>
-  fetchMetrics: (id: string) => Promise<void>
-  addMetricPoint: (metric: MetricPoint) => void
+  fetchExperiment: (id: number | string) => Promise<void>
+  createExperiment: (data: { name: string; description?: string; config?: Record<string, unknown>; schema_id?: number | null; tags?: string[] }) => Promise<Experiment>
+  updateExperiment: (id: number | string, data: { name?: string; description?: string; config?: Record<string, unknown>; tags?: string[] }) => Promise<void>
+  deleteExperiment: (id: number | string) => Promise<void>
+  cloneExperiment: (id: number | string) => Promise<Experiment>
+  startRun: (experimentId: number | string) => Promise<ExperimentRun>
+  stopRun: (runId: number | string) => Promise<void>
+  fetchRuns: (experimentId: number | string) => Promise<void>
+  fetchRunMetrics: (runId: number | string) => Promise<void>
+  addMetricLog: (metric: MetricLog) => void
   clearMetrics: () => void
 }
 
 export const useExperimentStore = create<ExperimentStore>((set) => ({
   experiments: [],
   selectedExperiment: null,
+  runs: [],
   metrics: [],
   loading: false,
   error: null,
@@ -95,17 +100,57 @@ export const useExperimentStore = create<ExperimentStore>((set) => ({
     }
   },
 
-  startExperiment: async (id) => {
-    const numId = Number(id)
+  cloneExperiment: async (id) => {
     set({ loading: true, error: null })
     try {
-      const experiment = await api.startExperiment(id)
+      const clone = await api.cloneExperiment(id)
       set((state) => ({
-        experiments: state.experiments.map((exp) =>
-          exp.id === numId ? experiment : exp
+        experiments: [...state.experiments, clone],
+        loading: false,
+      }))
+      return clone
+    } catch (error) {
+      set({ error: String(error), loading: false })
+      throw error
+    }
+  },
+
+  startRun: async (experimentId) => {
+    set({ loading: true, error: null })
+    try {
+      const run = await api.startRun(experimentId)
+      set((state) => ({
+        runs: [...state.runs, run],
+        loading: false,
+      }))
+      // Refresh experiment to get updated status
+      const numId = Number(experimentId)
+      try {
+        const updated = await api.getExperiment(experimentId)
+        set((state) => ({
+          experiments: state.experiments.map((exp) =>
+            exp.id === numId ? updated : exp
+          ),
+          selectedExperiment:
+            state.selectedExperiment?.id === numId ? updated : state.selectedExperiment,
+        }))
+      } catch { /* ignore refresh failure */ }
+      return run
+    } catch (error) {
+      set({ error: String(error), loading: false })
+      throw error
+    }
+  },
+
+  stopRun: async (runId) => {
+    set({ loading: true, error: null })
+    try {
+      await api.stopRun(runId)
+      const numId = Number(runId)
+      set((state) => ({
+        runs: state.runs.map((r) =>
+          r.id === numId ? { ...r, status: 'cancelled' as RunStatus } : r
         ),
-        selectedExperiment:
-          state.selectedExperiment?.id === numId ? experiment : state.selectedExperiment,
         loading: false,
       }))
     } catch (error) {
@@ -113,35 +158,27 @@ export const useExperimentStore = create<ExperimentStore>((set) => ({
     }
   },
 
-  stopExperiment: async (id) => {
-    const numId = Number(id)
+  fetchRuns: async (experimentId) => {
     set({ loading: true, error: null })
     try {
-      const experiment = await api.stopExperiment(id)
-      set((state) => ({
-        experiments: state.experiments.map((exp) =>
-          exp.id === numId ? experiment : exp
-        ),
-        selectedExperiment:
-          state.selectedExperiment?.id === numId ? experiment : state.selectedExperiment,
-        loading: false,
-      }))
+      const runs = await api.getExperimentRuns(experimentId)
+      set({ runs, loading: false })
     } catch (error) {
       set({ error: String(error), loading: false })
     }
   },
 
-  fetchMetrics: async (id) => {
+  fetchRunMetrics: async (runId) => {
     set({ loading: true, error: null })
     try {
-      const metrics = await api.getExperimentMetrics(id)
+      const metrics = await api.getRunMetrics(runId)
       set({ metrics, loading: false })
     } catch (error) {
       set({ error: String(error), loading: false })
     }
   },
 
-  addMetricPoint: (metric) => {
+  addMetricLog: (metric) => {
     set((state) => ({
       metrics: [...state.metrics, metric],
     }))

@@ -1,41 +1,64 @@
 export enum ExperimentStatus {
-  PENDING = 'PENDING',
-  RUNNING = 'RUNNING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED',
+  DRAFT = 'draft',
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+}
+
+export enum RunStatus {
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
 }
 
 export interface Experiment {
   id: number
   name: string
   description: string
-  framework: string
   status: ExperimentStatus
-  script_path: string
-  hyperparameters: Record<string, unknown>
+  config: Record<string, unknown>
+  schema_id: number | null
   tags: string[]
   created_at: string
   updated_at: string
-  started_at?: string
-  completed_at?: string
 }
 
-export interface MetricPoint {
+export interface ExperimentRun {
   id: number
-  experiment_id: number
+  experiment_config_id: number
+  status: RunStatus
+  pid: number | null
+  log_path: string | null
+  metrics_summary: Record<string, unknown> | null
+  checkpoint_path: string | null
+  started_at: string | null
+  ended_at: string | null
+}
+
+export interface MetricLog {
+  id: number
+  run_id: number
   step: number
-  name: string
-  value: number
+  epoch: number | null
   timestamp: string
+  metrics_json: Record<string, unknown>
 }
 
 export interface ExperimentCreate {
   name: string
   description?: string
-  framework: string
-  script_path: string
-  hyperparameters: Record<string, unknown>
+  config?: Record<string, unknown>
+  schema_id?: number | null
+  tags?: string[]
+}
+
+export interface ExperimentUpdate {
+  name?: string
+  description?: string
+  config?: Record<string, unknown>
   tags?: string[]
 }
 

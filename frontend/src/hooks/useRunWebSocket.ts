@@ -46,7 +46,11 @@ export function useRunWebSocket<T = unknown>(
           const type = (msg as Record<string, unknown>)?.type
           if (type === 'keepalive' || type === 'pong') return
 
-          setData((prev) => [...prev, msg])
+          const MAX_BUFFER = 5000
+          setData((prev) => {
+            const next = [...prev, msg]
+            return next.length > MAX_BUFFER ? next.slice(-MAX_BUFFER) : next
+          })
           setLastMessage(msg)
         } catch {
           // ignore parse errors

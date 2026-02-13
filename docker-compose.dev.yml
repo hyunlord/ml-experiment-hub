@@ -1,0 +1,63 @@
+# =============================================================================
+# ML Experiment Hub - Development Override
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: dev
+    volumes:
+      # Source code mounts for hot reload (override prod COPY)
+      - ./backend:/app/backend
+      - ./shared:/app/shared
+      - ./adapters:/app/adapters
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      # Data volumes (same as prod)
+      - ./data:/data
+      - ${PROJECTS_DIR:-./_projects}:/projects:ro
+      - ${DATA_DIR:-./_data}:/ml-data:ro
+      - ${CHECKPOINT_DIR:-./_checkpoints}:/checkpoints
+      - /tmp/ml-hub-configs:/tmp/configs
+      - ml-venvs:/data/venvs
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:////data/ml_hub.db
+      - PROJECTS_DIR=/projects
+      - DATA_DIR=/ml-data
+      - CHECKPOINT_BASE_DIR=/checkpoints
+      - LOG_DIR=/data/logs
+      - CONFIG_DIR=/tmp/configs
+      - VENVS_DIR=/data/venvs
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+      - LOG_LEVEL=DEBUG
+    command: ["uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.app.json:/app/tsconfig.app.json
+      - ./frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./frontend/postcss.config.js:/app/postcss.config.js
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+
+volumes:
+  ml-venvs:

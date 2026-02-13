@@ -50,3 +50,15 @@ class BaseAdapter(ABC):
     def get_name(self) -> str:
         """Return human-readable adapter name."""
         return self.__class__.__name__
+
+    def get_metrics_mapping(self) -> dict[str, dict[str, str]]:
+        """Return mapping of metric keys to display metadata.
+
+        Override to provide chart grouping, labels, and optimization direction
+        for the frontend dashboard.
+
+        Returns:
+            Dict mapping metric key to {"group", "label", "direction"}.
+            direction is "minimize" or "maximize".
+        """
+        return {}
