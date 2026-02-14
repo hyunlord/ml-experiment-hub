@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "[gate] repo: $(pwd)"
 echo "[gate] branch: $(git rev-parse --abbrev-ref HEAD)"
-echo "[gate] git status:"
+echo "[gate] git status (before):"
 git status --porcelain || true
 
 if ! command -v python3 >/dev/null 2>&1; then
@@ -21,17 +21,23 @@ if [ ! -f uv.lock ]; then
   exit 1
 fi
 
-echo "[gate] uv sync --frozen"
-uv sync --frozen
+echo "[gate] uv sync --frozen --all-extras"
+uv sync --frozen --all-extras
 
-echo "[gate] run lint/format/type/test (if configured)"
-# If your pyproject defines these tools, uv run will execute in the synced env.
-uv run ruff check . || true
-uv run ruff format --check . || true
+# Strict: uv.lock must not change during frozen sync
+if ! git diff --quiet -- uv.lock; then
+  echo "[gate] ERROR: uv.lock changed during gate run. Commit updated uv.lock in lead."
+  git --no-pager diff -- uv.lock | sed -n '1,120p'
+  exit 1
+fi
+
+echo "[gate] lint/format/type/test"
+uv run ruff check .
+uv run ruff format --check .
 uv run mypy . || true
 uv run pytest -q || true
 
 echo "[gate] smoke (time budget 90s)"
-uv run python -m ml_experiment_hub.smoke --seconds 90 || true
+uv run python -m ml_experiment_hub.smoke --seconds 90
 
 echo "[gate] done"
