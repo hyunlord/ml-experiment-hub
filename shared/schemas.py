@@ -27,6 +27,23 @@ class RunStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class JobType(str, Enum):
+    """Type of background job."""
+
+    EVAL = "eval"
+    INDEX_BUILD = "index_build"
+
+
+class JobStatus(str, Enum):
+    """Status of a background job."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class MetricPoint(BaseModel):
     """A single metric log entry with free-form key-value metrics."""
 

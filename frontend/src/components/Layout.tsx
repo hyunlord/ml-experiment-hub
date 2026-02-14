@@ -8,6 +8,7 @@ import {
   Home,
   Moon,
   Play,
+  Search,
   Settings,
   Sun,
   Wrench,
@@ -53,6 +54,11 @@ function useNavItems(): NavItem[] {
       label: 'Running',
       icon: <Play className="h-5 w-5" />,
       badge: runningCount || null,
+    },
+    {
+      to: '/demo/search',
+      label: 'Search Demo',
+      icon: <Search className="h-5 w-5" />,
     },
     {
       to: '/schemas',
@@ -162,6 +168,7 @@ function TopBar() {
     if (path.startsWith('/runs/')) return 'Run Monitor'
     if (path === '/compare' || path.startsWith('/compare?')) return 'Compare'
     if (path === '/running') return 'Running'
+    if (path === '/demo/search') return 'Search Demo'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'
     return 'ML Experiment Hub'

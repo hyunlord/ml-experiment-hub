@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlmodel import Column, Field, JSON, Relationship, SQLModel
 
-from shared.schemas import ExperimentConfigStatus, RunStatus
+from shared.schemas import ExperimentConfigStatus, JobStatus, JobType, RunStatus
 
 
 class ConfigSchema(SQLModel, table=True):
@@ -128,3 +128,37 @@ class SystemStats(SQLModel, table=True):
 
     # Relationships
     run: ExperimentRun = Relationship(back_populates="system_stats")
+
+
+class Job(SQLModel, table=True):
+    """Background job for eval or index building.
+
+    Jobs run as subprocesses with DB-based progress tracking.
+    Results are stored in result_json on completion.
+    """
+
+    __tablename__ = "jobs"
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_type: JobType = Field(description="Type of job (eval/index_build)")
+    run_id: int = Field(foreign_key="experiment_runs.id", index=True)
+    status: JobStatus = Field(default=JobStatus.PENDING)
+    progress: int = Field(default=0, ge=0, le=100, description="Progress 0-100%")
+    config_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Job configuration (checkpoint, bit_lengths, etc.)",
+    )
+    result_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Job results (metrics, index path, etc.)",
+    )
+    error_message: str | None = Field(default=None)
+    pid: int | None = Field(default=None, description="System process ID")
+    started_at: datetime | None = Field(default=None)
+    ended_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    run: ExperimentRun = Relationship()

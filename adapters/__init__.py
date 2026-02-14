@@ -3,11 +3,13 @@
 from adapters.base import BaseAdapter
 from adapters.huggingface import HuggingFaceAdapter
 from adapters.pytorch_lightning import PyTorchLightningAdapter
+from adapters.vlm_quantization.adapter import VLMQuantizationAdapter
 
 # Adapter registry for dynamic loading
 ADAPTER_REGISTRY: dict[str, type[BaseAdapter]] = {
     "pytorch_lightning": PyTorchLightningAdapter,
     "huggingface": HuggingFaceAdapter,
+    "vlm_quantization": VLMQuantizationAdapter,
 }
 
 
@@ -34,6 +36,7 @@ __all__ = [
     "BaseAdapter",
     "HuggingFaceAdapter",
     "PyTorchLightningAdapter",
+    "VLMQuantizationAdapter",
     "ADAPTER_REGISTRY",
     "get_adapter",
 ]

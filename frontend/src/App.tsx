@@ -9,6 +9,7 @@ import ExperimentComparePage from './pages/ExperimentComparePage'
 import SchemasPage from './pages/SchemasPage'
 import SettingsPage from './pages/SettingsPage'
 import RunningPage from './pages/RunningPage'
+import SearchDemoPage from './pages/SearchDemoPage'
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
         <Route path="/running" element={<RunningPage />} />
         <Route path="/schemas" element={<SchemasPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/demo/search" element={<SearchDemoPage />} />
       </Routes>
     </Layout>
   )
