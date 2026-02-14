@@ -125,3 +125,55 @@ class DryRunResponse(BaseModel):
     working_dir: str
     effective_config: dict[str, Any]
     warnings: list[str]
+
+
+class RunSummaryResponse(BaseModel):
+    """Schema for run result summary."""
+
+    run_id: int
+    experiment_config_id: int
+    status: RunStatus
+    metrics_summary: dict[str, Any]
+    started_at: datetime | None
+    ended_at: datetime | None
+    duration_seconds: float | None
+
+
+class CheckpointEntry(BaseModel):
+    """Single checkpoint file info."""
+
+    path: str
+    size_bytes: int
+    modified_at: datetime | None
+
+
+class CheckpointsResponse(BaseModel):
+    """Schema for checkpoint listing."""
+
+    run_id: int
+    checkpoint_path: str | None
+    checkpoints: list[CheckpointEntry]
+    total_size_bytes: int
+
+
+class CompareRequest(BaseModel):
+    """Request for comparing multiple experiments."""
+
+    ids: list[int] = Field(min_length=2, max_length=4)
+
+
+class CompareExperimentEntry(BaseModel):
+    """Single experiment entry in compare response."""
+
+    id: int
+    name: str
+    config: dict[str, Any]
+    metrics_summary: dict[str, Any] | None
+    status: str
+
+
+class CompareResponse(BaseModel):
+    """Response for experiment comparison."""
+
+    experiments: list[CompareExperimentEntry]
+    config_diff_keys: list[str]

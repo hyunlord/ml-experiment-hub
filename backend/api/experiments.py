@@ -1,12 +1,17 @@
 """REST API endpoints for experiment management."""
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
 
 from backend.models.database import get_session
+from backend.models.experiment import ExperimentRun, MetricLog
 from backend.schemas.experiment import (
+    CompareExperimentEntry,
+    CompareRequest,
+    CompareResponse,
     DryRunResponse,
     ExperimentCreate,
     ExperimentDiffRequest,
@@ -33,7 +38,11 @@ async def list_experiments(
     """List experiment configurations with pagination and filters."""
     service = ExperimentService(session)
     experiments = await service.list_experiments(
-        skip=skip, limit=limit, status=status, schema_id=schema_id, tags=tags,
+        skip=skip,
+        limit=limit,
+        status=status,
+        schema_id=schema_id,
+        tags=tags,
     )
     total = await service.count_experiments(status=status, schema_id=schema_id)
     return ExperimentListResponse(
@@ -172,7 +181,9 @@ async def dry_run_experiment(
     if "training" in nested_config and isinstance(nested_config["training"], dict):
         batch_size = nested_config["training"].get("batch_size")
         if batch_size == "auto":
-            warnings.append("training.batch_size set to 'auto' - will be resolved at runtime based on GPU memory")
+            warnings.append(
+                "training.batch_size set to 'auto' - will be resolved at runtime based on GPU memory"
+            )
 
     return DryRunResponse(
         config_yaml=config_yaml,
@@ -181,3 +192,88 @@ async def dry_run_experiment(
         effective_config=nested_config,
         warnings=warnings,
     )
+
+
+@router.post("/compare", response_model=CompareResponse)
+async def compare_experiments(
+    body: CompareRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CompareResponse:
+    """Compare multiple experiments: configs + latest run metrics."""
+    service = ExperimentService(session)
+    entries: list[CompareExperimentEntry] = []
+
+    for exp_id in body.ids:
+        experiment = await service.get_experiment(exp_id)
+        if not experiment:
+            raise HTTPException(status_code=404, detail=f"Experiment {exp_id} not found")
+
+        # Get latest run's metrics_summary
+        result = await session.execute(
+            select(ExperimentRun)
+            .where(ExperimentRun.experiment_config_id == exp_id)
+            .order_by(ExperimentRun.started_at.desc())
+            .limit(1)
+        )
+        latest_run = result.scalar_one_or_none()
+
+        entries.append(
+            CompareExperimentEntry(
+                id=experiment.id,  # type: ignore[arg-type]
+                name=experiment.name,
+                config=experiment.config_json or {},
+                metrics_summary=latest_run.metrics_summary if latest_run else None,
+                status=experiment.status.value,
+            )
+        )
+
+    # Find config keys that differ across experiments
+    all_keys: set[str] = set()
+    configs = [e.config for e in entries]
+    for cfg in configs:
+        all_keys.update(cfg.keys())
+
+    diff_keys: list[str] = []
+    for key in sorted(all_keys):
+        values = [cfg.get(key) for cfg in configs]
+        if len(set(str(v) for v in values)) > 1:
+            diff_keys.append(key)
+
+    return CompareResponse(experiments=entries, config_diff_keys=diff_keys)
+
+
+@router.get("/{experiment_id}/metrics")
+async def get_experiment_metrics(
+    experiment_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[dict[str, Any]]:
+    """Get metrics from the latest run of an experiment.
+
+    Convenience endpoint: finds the latest run and returns its metric logs
+    as a flat list of {step, name, value} for the compare page.
+    """
+    # Find the latest run
+    result = await session.execute(
+        select(ExperimentRun)
+        .where(ExperimentRun.experiment_config_id == experiment_id)
+        .order_by(ExperimentRun.started_at.desc())
+        .limit(1)
+    )
+    latest_run = result.scalar_one_or_none()
+    if not latest_run:
+        return []
+
+    # Fetch metric logs for that run
+    result = await session.execute(
+        select(MetricLog).where(MetricLog.run_id == latest_run.id).order_by(MetricLog.step)
+    )
+    logs = result.scalars().all()
+
+    # Flatten to {step, name, value} format expected by compare page
+    points: list[dict[str, Any]] = []
+    for log in logs:
+        for key, value in (log.metrics_json or {}).items():
+            if isinstance(value, (int, float)):
+                points.append({"step": log.step, "name": key, "value": value})
+
+    return points

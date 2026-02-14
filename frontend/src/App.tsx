@@ -21,6 +21,7 @@ function App() {
         <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
         <Route path="/runs/:runId" element={<RunMonitorPage />} />
         <Route path="/compare" element={<ExperimentComparePage />} />
+        <Route path="/experiments/compare" element={<ExperimentComparePage />} />
         <Route path="/running" element={<RunningPage />} />
         <Route path="/schemas" element={<SchemasPage />} />
         <Route path="/settings" element={<SettingsPage />} />

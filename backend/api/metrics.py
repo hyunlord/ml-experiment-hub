@@ -1,5 +1,8 @@
 """Metrics API: HTTP collection, REST queries, and WebSocket streaming."""
 
+from backend.models.database import async_session_maker
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 import asyncio
 import logging
 from datetime import datetime
@@ -24,6 +27,7 @@ router = APIRouter(tags=["metrics"])
 # ---------------------------------------------------------------------------
 # Request / Response schemas
 # ---------------------------------------------------------------------------
+
 
 class MetricIngest(BaseModel):
     """Body for POST /api/runs/{run_id}/metrics (from training process)."""
@@ -52,6 +56,7 @@ class MetricsQueryResponse(BaseModel):
 
 class SystemStatsIngest(BaseModel):
     """Body for POST /api/runs/{run_id}/system."""
+
     gpu_util: float | None = None
     gpu_memory_used: float | None = None
     gpu_memory_total: float | None = None
@@ -65,6 +70,7 @@ class SystemStatsIngest(BaseModel):
 # HTTP Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.post("/api/runs/{run_id}/metrics", status_code=201)
 async def ingest_metrics(
     run_id: int,
@@ -77,9 +83,7 @@ async def ingest_metrics(
     to push metrics to the server in real time.
     """
     # Verify run exists
-    result = await session.execute(
-        select(ExperimentRun).where(ExperimentRun.id == run_id)
-    )
+    result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
@@ -120,9 +124,7 @@ async def ingest_system_stats(
 ) -> dict[str, str]:
     """Receive system stats from training process or system monitor."""
     # Verify run exists
-    result = await session.execute(
-        select(ExperimentRun).where(ExperimentRun.id == run_id)
-    )
+    result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
@@ -173,21 +175,19 @@ async def query_metrics(
     run_id: int,
     session: Annotated[AsyncSession, Depends(get_session)],
     keys: str | None = Query(default=None, description="Comma-separated metric keys to filter"),
-    downsample: int | None = Query(default=None, ge=3, le=10000, description="Target points via LTTB"),
+    downsample: int | None = Query(
+        default=None, ge=3, le=10000, description="Target points via LTTB"
+    ),
 ) -> MetricsQueryResponse:
     """Query stored metrics for a run with optional key filtering and downsampling."""
     # Verify run exists
-    result = await session.execute(
-        select(ExperimentRun).where(ExperimentRun.id == run_id)
-    )
+    result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
 
     # Fetch all metric logs ordered by step
     result = await session.execute(
-        select(MetricLog)
-        .where(MetricLog.run_id == run_id)
-        .order_by(MetricLog.step)
+        select(MetricLog).where(MetricLog.run_id == run_id).order_by(MetricLog.step)
     )
     logs = result.scalars().all()
 
@@ -202,12 +202,14 @@ async def query_metrics(
             if not metrics:
                 continue
 
-        data.append({
-            "step": log.step,
-            "epoch": log.epoch,
-            "timestamp": log.timestamp.isoformat(),
-            "metrics": metrics,
-        })
+        data.append(
+            {
+                "step": log.step,
+                "epoch": log.epoch,
+                "timestamp": log.timestamp.isoformat(),
+                "metrics": metrics,
+            }
+        )
 
     total = len(data)
 
@@ -247,6 +249,7 @@ async def query_metrics(
 # WebSocket Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.websocket("/ws/runs/{run_id}/metrics")
 async def ws_metrics(websocket: WebSocket, run_id: int) -> None:
     """Stream metrics for a run in real time.
@@ -267,14 +270,17 @@ async def ws_metrics(websocket: WebSocket, run_id: int) -> None:
             recent = list(reversed(result.scalars().all()))
 
             for log in recent:
-                await manager.send_personal(websocket, {
-                    "type": "metric",
-                    "run_id": run_id,
-                    "step": log.step,
-                    "epoch": log.epoch,
-                    "metrics": log.metrics_json,
-                    "timestamp": log.timestamp.isoformat(),
-                })
+                await manager.send_personal(
+                    websocket,
+                    {
+                        "type": "metric",
+                        "run_id": run_id,
+                        "step": log.step,
+                        "epoch": log.epoch,
+                        "metrics": log.metrics_json,
+                        "timestamp": log.timestamp.isoformat(),
+                    },
+                )
 
         # Keep alive — new metrics arrive via broadcast from ingest endpoint
         while True:
@@ -314,16 +320,19 @@ async def ws_system(websocket: WebSocket, run_id: int) -> None:
                     stats = result.scalars().all()
 
                     for stat in stats:
-                        await manager.send_personal(websocket, {
-                            "type": "system_stats",
-                            "run_id": run_id,
-                            "timestamp": stat.timestamp.isoformat(),
-                            "gpu_util": stat.gpu_util,
-                            "gpu_memory_used": stat.gpu_memory_used,
-                            "gpu_memory_total": stat.gpu_memory_total,
-                            "cpu_percent": stat.cpu_percent,
-                            "ram_percent": stat.ram_percent,
-                        })
+                        await manager.send_personal(
+                            websocket,
+                            {
+                                "type": "system_stats",
+                                "run_id": run_id,
+                                "timestamp": stat.timestamp.isoformat(),
+                                "gpu_util": stat.gpu_util,
+                                "gpu_memory_used": stat.gpu_memory_used,
+                                "gpu_memory_total": stat.gpu_memory_total,
+                                "cpu_percent": stat.cpu_percent,
+                                "ram_percent": stat.ram_percent,
+                            },
+                        )
                         last_id = stat.id  # type: ignore[assignment]
 
                 # Check for client messages (ping/disconnect)
@@ -352,19 +361,20 @@ async def ws_logs(websocket: WebSocket, run_id: int) -> None:
     try:
         # Find log path from ExperimentRun
         async with _get_session_ctx() as session:
-            result = await session.execute(
-                select(ExperimentRun).where(ExperimentRun.id == run_id)
-            )
+            result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
             run = result.scalar_one_or_none()
 
         log_path = Path(run.log_path) if run and run.log_path else None
 
         if not log_path or not log_path.exists():
-            await manager.send_personal(websocket, {
-                "type": "log",
-                "run_id": run_id,
-                "line": "[No log file available]",
-            })
+            await manager.send_personal(
+                websocket,
+                {
+                    "type": "log",
+                    "run_id": run_id,
+                    "line": "[No log file available]",
+                },
+            )
             # Still keep connection alive for future logs
             while True:
                 try:
@@ -379,31 +389,33 @@ async def ws_logs(websocket: WebSocket, run_id: int) -> None:
                 # Send last 100 lines as catch-up
                 lines = f.readlines()
                 for line in lines[-100:]:
-                    await manager.send_personal(websocket, {
-                        "type": "log",
-                        "run_id": run_id,
-                        "line": line.rstrip("\n"),
-                    })
+                    await manager.send_personal(
+                        websocket,
+                        {
+                            "type": "log",
+                            "run_id": run_id,
+                            "line": line.rstrip("\n"),
+                        },
+                    )
 
                 # Stream new lines as they appear
                 while True:
                     line = f.readline()
                     if line:
-                        await manager.send_personal(websocket, {
-                            "type": "log",
-                            "run_id": run_id,
-                            "line": line.rstrip("\n"),
-                        })
+                        await manager.send_personal(
+                            websocket,
+                            {
+                                "type": "log",
+                                "run_id": run_id,
+                                "line": line.rstrip("\n"),
+                            },
+                        )
                     else:
                         # No new line — check for client messages
                         try:
-                            data = await asyncio.wait_for(
-                                websocket.receive_text(), timeout=0.5
-                            )
+                            data = await asyncio.wait_for(websocket.receive_text(), timeout=0.5)
                             if data == "ping":
-                                await manager.send_personal(
-                                    websocket, {"type": "pong"}
-                                )
+                                await manager.send_personal(websocket, {"type": "pong"})
                         except asyncio.TimeoutError:
                             pass
 
@@ -418,11 +430,6 @@ async def ws_logs(websocket: WebSocket, run_id: int) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-from backend.models.database import async_session_maker
 
 
 @asynccontextmanager

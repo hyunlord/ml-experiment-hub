@@ -10,7 +10,6 @@ Handles vlm_quantization (Cross-Modal Deep Hashing) project:
 import json
 import os
 import re
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -85,10 +84,12 @@ class PyTorchLightningAdapter(BaseAdapter):
                         # UI key like "coco_ko" → resolve to path dict
                         entry = DATASET_REGISTRY.get(item)
                         if entry:
-                            resolved.append({
-                                "jsonl_path": str(Path(data_dir) / entry["jsonl_path"]),
-                                "data_root": str(Path(data_dir) / entry["data_root"]),
-                            })
+                            resolved.append(
+                                {
+                                    "jsonl_path": str(Path(data_dir) / entry["jsonl_path"]),
+                                    "data_root": str(Path(data_dir) / entry["data_root"]),
+                                }
+                            )
                     elif isinstance(item, dict):
                         # Already a full path dict (from clone/direct edit)
                         resolved.append(item)

@@ -1,6 +1,5 @@
 """Room-based WebSocket connection manager for real-time streaming."""
 
-import asyncio
 from typing import Any
 
 from fastapi import WebSocket
@@ -19,9 +18,7 @@ class ConnectionManager:
         # (run_id, channel) -> list of WebSocket connections
         self._rooms: dict[tuple[int, str], list[WebSocket]] = {}
 
-    async def connect(
-        self, websocket: WebSocket, run_id: int, channel: str = "metrics"
-    ) -> None:
+    async def connect(self, websocket: WebSocket, run_id: int, channel: str = "metrics") -> None:
         """Accept and register a WebSocket to a room."""
         await websocket.accept()
         key = (run_id, channel)
@@ -29,9 +26,7 @@ class ConnectionManager:
             self._rooms[key] = []
         self._rooms[key].append(websocket)
 
-    def disconnect(
-        self, websocket: WebSocket, run_id: int, channel: str = "metrics"
-    ) -> None:
+    def disconnect(self, websocket: WebSocket, run_id: int, channel: str = "metrics") -> None:
         """Remove a WebSocket from a room."""
         key = (run_id, channel)
         if key in self._rooms:
@@ -42,9 +37,7 @@ class ConnectionManager:
             if not self._rooms[key]:
                 del self._rooms[key]
 
-    async def broadcast(
-        self, run_id: int, data: dict[str, Any], channel: str = "metrics"
-    ) -> None:
+    async def broadcast(self, run_id: int, data: dict[str, Any], channel: str = "metrics") -> None:
         """Send data to all clients in a room."""
         key = (run_id, channel)
         connections = self._rooms.get(key)
@@ -61,9 +54,7 @@ class ConnectionManager:
         for ws in disconnected:
             self.disconnect(ws, run_id, channel)
 
-    async def send_personal(
-        self, websocket: WebSocket, data: dict[str, Any]
-    ) -> None:
+    async def send_personal(self, websocket: WebSocket, data: dict[str, Any]) -> None:
         """Send data to a single client."""
         try:
             await websocket.send_json(data)

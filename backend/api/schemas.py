@@ -44,16 +44,11 @@ async def list_schemas(
 ) -> ConfigSchemaListResponse:
     """List all config schema templates."""
     result = await session.execute(
-        select(ConfigSchema)
-        .offset(skip)
-        .limit(limit)
-        .order_by(ConfigSchema.created_at.desc())
+        select(ConfigSchema).offset(skip).limit(limit).order_by(ConfigSchema.created_at.desc())
     )
     schemas = result.scalars().all()
 
-    count_result = await session.execute(
-        select(func.count()).select_from(ConfigSchema)
-    )
+    count_result = await session.execute(select(func.count()).select_from(ConfigSchema))
     total = count_result.scalar() or 0
 
     return ConfigSchemaListResponse(
@@ -68,9 +63,7 @@ async def get_schema(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ConfigSchemaResponse:
     """Get a config schema by ID."""
-    result = await session.execute(
-        select(ConfigSchema).where(ConfigSchema.id == schema_id)
-    )
+    result = await session.execute(select(ConfigSchema).where(ConfigSchema.id == schema_id))
     schema = result.scalar_one_or_none()
     if not schema:
         raise HTTPException(status_code=404, detail="Schema not found")
@@ -84,9 +77,7 @@ async def update_schema(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> ConfigSchemaResponse:
     """Update a config schema."""
-    result = await session.execute(
-        select(ConfigSchema).where(ConfigSchema.id == schema_id)
-    )
+    result = await session.execute(select(ConfigSchema).where(ConfigSchema.id == schema_id))
     schema = result.scalar_one_or_none()
     if not schema:
         raise HTTPException(status_code=404, detail="Schema not found")
@@ -110,9 +101,7 @@ async def delete_schema(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> None:
     """Delete a config schema."""
-    result = await session.execute(
-        select(ConfigSchema).where(ConfigSchema.id == schema_id)
-    )
+    result = await session.execute(select(ConfigSchema).where(ConfigSchema.id == schema_id))
     schema = result.scalar_one_or_none()
     if not schema:
         raise HTTPException(status_code=404, detail="Schema not found")

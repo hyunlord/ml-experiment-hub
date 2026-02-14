@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 run.ended_at = datetime.utcnow()
             await session.commit()
             import logging
+
             logging.getLogger(__name__).warning(
                 "Cleaned up %d stale RUNNING runs from previous server session",
                 len(stale_runs),
@@ -44,12 +45,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Start system monitor service
     from backend.core.system_monitor import system_monitor
+
     system_monitor.start()
 
     yield
 
     # Shutdown: Stop system monitor
     from backend.core.system_monitor import system_monitor
+
     system_monitor.stop()
 
 

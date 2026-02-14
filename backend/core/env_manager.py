@@ -116,8 +116,7 @@ class ProjectEnvManager:
         current_hash = self._deps_hash(project_path)
         if not current_hash:
             raise FileNotFoundError(
-                f"No dependency files (requirements.txt / pyproject.toml) "
-                f"found in {project_path}"
+                f"No dependency files (requirements.txt / pyproject.toml) found in {project_path}"
             )
 
         stored_hash = self._read_marker(project_path)
@@ -155,9 +154,13 @@ class ProjectEnvManager:
         elif has_requirements:
             rc, output = await self._run(
                 [
-                    "uv", "pip", "install",
-                    "--python", python_path,
-                    "-r", str(project / "requirements.txt"),
+                    "uv",
+                    "pip",
+                    "install",
+                    "--python",
+                    python_path,
+                    "-r",
+                    str(project / "requirements.txt"),
                 ],
             )
             if rc != 0:

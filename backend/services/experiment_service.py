@@ -47,9 +47,7 @@ class ExperimentService:
         # Post-filter by tags for SQLite compatibility
         if tags:
             tag_set = set(tags)
-            experiments = [
-                exp for exp in experiments if tag_set.issubset(set(exp.tags or []))
-            ]
+            experiments = [exp for exp in experiments if tag_set.issubset(set(exp.tags or []))]
 
         return experiments
 
@@ -156,9 +154,7 @@ class ExperimentService:
         await self.session.refresh(clone)
         return clone
 
-    async def diff_experiments(
-        self, experiment_id: int, compare_with_id: int
-    ) -> dict[str, Any]:
+    async def diff_experiments(self, experiment_id: int, compare_with_id: int) -> dict[str, Any]:
         """Compare config of two experiments and return differences."""
         base = await self.get_experiment(experiment_id)
         if not base:
@@ -173,18 +169,14 @@ class ExperimentService:
 
         return diff_configs(base.config_json or {}, other.config_json or {})
 
-    async def _validate_config_against_schema(
-        self, schema_id: int, config: dict[str, Any]
-    ) -> None:
+    async def _validate_config_against_schema(self, schema_id: int, config: dict[str, Any]) -> None:
         """Validate config keys against a ConfigSchema's required fields."""
         result = await self.session.execute(
             select(ConfigSchema).where(ConfigSchema.id == schema_id)
         )
         schema = result.scalar_one_or_none()
         if not schema:
-            raise HTTPException(
-                status_code=404, detail=f"Schema {schema_id} not found"
-            )
+            raise HTTPException(status_code=404, detail=f"Schema {schema_id} not found")
 
         # Parse the stored schema definition
         try:

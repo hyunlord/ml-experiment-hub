@@ -7,7 +7,6 @@ Broadcasts updates via WebSocket to connected dashboard clients.
 import asyncio
 import logging
 import shutil
-import subprocess
 from datetime import datetime
 from typing import Any
 
@@ -59,9 +58,7 @@ class SystemMonitorService:
                 async with async_session_maker() as session:
                     # Find all running experiments
                     result = await session.execute(
-                        select(ExperimentRun).where(
-                            ExperimentRun.status == RunStatus.RUNNING
-                        )
+                        select(ExperimentRun).where(ExperimentRun.status == RunStatus.RUNNING)
                     )
                     active_runs = result.scalars().all()
 
@@ -70,7 +67,9 @@ class SystemMonitorService:
                         if stats:
                             for run in active_runs:
                                 await self._record_stats(
-                                    run.id, stats, session  # type: ignore[arg-type]
+                                    run.id,
+                                    stats,
+                                    session,  # type: ignore[arg-type]
                                 )
                             await session.commit()
 
@@ -115,7 +114,8 @@ class SystemMonitorService:
         try:
             # Use top command for quick CPU snapshot (macOS & Linux compatible)
             proc = await asyncio.create_subprocess_exec(
-                "python", "-c",
+                "python",
+                "-c",
                 "import psutil; print(psutil.cpu_percent(interval=0.1))",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -129,7 +129,8 @@ class SystemMonitorService:
         """Get RAM utilization percentage."""
         try:
             proc = await asyncio.create_subprocess_exec(
-                "python", "-c",
+                "python",
+                "-c",
                 "import psutil; print(psutil.virtual_memory().percent)",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
@@ -159,15 +160,21 @@ class SystemMonitorService:
             for line in lines:
                 parts = [p.strip() for p in line.split(",")]
                 if len(parts) >= 5:
-                    gpus.append({
-                        "index": int(parts[0]),
-                        "name": parts[1],
-                        "util": float(parts[2]),
-                        "memory_used_mb": float(parts[3]),
-                        "memory_total_mb": float(parts[4]),
-                        "memory_percent": round(float(parts[3]) / float(parts[4]) * 100, 1) if float(parts[4]) > 0 else 0,
-                        "temperature": float(parts[5]) if len(parts) > 5 and parts[5] != "N/A" else None,
-                    })
+                    gpus.append(
+                        {
+                            "index": int(parts[0]),
+                            "name": parts[1],
+                            "util": float(parts[2]),
+                            "memory_used_mb": float(parts[3]),
+                            "memory_total_mb": float(parts[4]),
+                            "memory_percent": round(float(parts[3]) / float(parts[4]) * 100, 1)
+                            if float(parts[4]) > 0
+                            else 0,
+                            "temperature": float(parts[5])
+                            if len(parts) > 5 and parts[5] != "N/A"
+                            else None,
+                        }
+                    )
 
             if not gpus:
                 return None
