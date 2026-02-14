@@ -265,3 +265,40 @@ class QueueEntry(SQLModel, table=True):
     # Relationships
     experiment_config: ExperimentConfig = Relationship()
     run: ExperimentRun | None = Relationship()
+
+
+class DatasetDefinition(SQLModel, table=True):
+    """Registered dataset for training.
+
+    Tracks dataset location, JSONL readiness, and prepare job state.
+    Status is computed dynamically from file system checks.
+    """
+
+    __tablename__ = "dataset_definitions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True, description="Unique slug (e.g. coco, coco_ko)")
+    name: str = Field(description="Display name")
+    description: str = Field(default="")
+    data_root: str = Field(default="", description="Path to image directory (relative to DATA_DIR)")
+    raw_path: str = Field(
+        default="",
+        description="Path to raw annotations (relative to DATA_DIR)",
+    )
+    jsonl_path: str = Field(
+        default="",
+        description="Path to prepared JSONL file (relative to DATA_DIR)",
+    )
+    raw_format: str = Field(
+        default="coco_karpathy",
+        description="Format of raw data: coco_karpathy, jsonl_copy, custom",
+    )
+    entry_count: int | None = Field(default=None, description="Cached JSONL entry count")
+    size_bytes: int | None = Field(default=None, description="Cached JSONL file size")
+    prepare_job_id: int | None = Field(
+        default=None,
+        foreign_key="jobs.id",
+        description="Active prepare job ID",
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

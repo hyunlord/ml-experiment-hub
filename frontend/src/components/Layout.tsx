@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Cpu,
+  Database,
   FlaskConical,
   Home,
   ListOrdered,
@@ -67,6 +68,11 @@ function useNavItems(): NavItem[] {
       to: '/queue',
       label: 'Queue',
       icon: <ListOrdered className="h-5 w-5" />,
+    },
+    {
+      to: '/datasets',
+      label: 'Datasets',
+      icon: <Database className="h-5 w-5" />,
     },
     {
       to: '/demo/search',
@@ -185,6 +191,7 @@ function TopBar() {
     if (path === '/hyperparam/new') return 'New HP Search'
     if (path.startsWith('/hyperparam/')) return 'HP Search Monitor'
     if (path === '/queue') return 'Experiment Queue'
+    if (path === '/datasets') return 'Datasets'
     if (path === '/demo/search') return 'Search Demo'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'

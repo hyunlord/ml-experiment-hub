@@ -33,6 +33,16 @@ class JobType(str, Enum):
     EVAL = "eval"
     INDEX_BUILD = "index_build"
     OPTUNA_SEARCH = "optuna_search"
+    DATASET_PREPARE = "dataset_prepare"
+
+
+class DatasetStatus(str, Enum):
+    """Status of a registered dataset."""
+
+    READY = "ready"
+    RAW_ONLY = "raw_only"
+    NOT_FOUND = "not_found"
+    PREPARING = "preparing"
 
 
 class TrialStatus(str, Enum):

@@ -13,6 +13,7 @@ import SearchDemoPage from './pages/SearchDemoPage'
 import HyperparamListPage from './pages/HyperparamListPage'
 import HyperparamSearchPage from './pages/HyperparamSearchPage'
 import QueuePage from './pages/QueuePage'
+import DatasetsPage from './pages/DatasetsPage'
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         <Route path="/hyperparam/new" element={<HyperparamSearchPage />} />
         <Route path="/hyperparam/:studyId" element={<HyperparamSearchPage />} />
         <Route path="/queue" element={<QueuePage />} />
+        <Route path="/datasets" element={<DatasetsPage />} />
         <Route path="/schemas" element={<SchemasPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/demo/search" element={<SearchDemoPage />} />
