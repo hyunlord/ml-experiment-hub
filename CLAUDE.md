@@ -1,21 +1,20 @@
-# CLAUDE.md — ml-experiment-hub (Lead / Integration)
+# CLAUDE.md — ml-experiment-hub (Lead)
 
 ## Role
 Lead engineer: architecture, integration, refactors, data model boundaries.
 
-## Branch/worktree rules
-- Work in: ml-experiment-hub-wt/lead
-- Ticket branches: t/<id>-<slug>
-- Gate checks: ./scripts/gate.sh (run in gate worktree)
+## Worktree rules
+- Work here: ml-experiment-hub-wt/lead (Claude Code)
+- Tickets: ml-experiment-hub-wt/t-<id>-<slug> (Codex Pro)
+- Gate: ml-experiment-hub-wt/gate (Codex CLI verification)
 
 ## Guardrails
-- Reproducibility first (seed/config/dataset version).
-- Clear separation: API / scheduler / worker / artifact store / metadata DB / UI.
-- Evaluation integrity: deterministic metrics and saved artifacts with lineage.
+- Reproducibility and evaluation integrity are non-negotiable.
+- Separate API/scheduler/worker/artifacts/metadata DB/UI.
+- Add a smoke test for any training/eval change.
 
-## Delegation format for Codex tickets
-Include:
+## Delegation template for Codex tickets
 - Objective / Non-goals
 - Files/dirs to touch
-- Acceptance criteria (tests + smoke + gate)
-- Risk notes (cost/perf/security)
+- Acceptance criteria: tests + ./scripts/gate.sh
+- Risk notes: cost/perf/security
