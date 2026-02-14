@@ -97,7 +97,7 @@ echo "════════════════════════�
 echo -e "${GREEN}ML Experiment Hub is running!${NC}"
 echo ""
 echo -e "  Dashboard:  ${CYAN}http://localhost:3000${NC}"
-echo -e "  API:        ${CYAN}http://localhost:8000${NC}"
+echo -e "  API:        ${CYAN}http://localhost:8002${NC}"
 echo ""
 echo -e "  Logs:       docker compose logs -f"
 echo -e "  Stop:       docker compose down"

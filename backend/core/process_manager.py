@@ -136,7 +136,7 @@ class ExperimentRunner:
         # Inject monitor config so MonitorCallback reports to hub
         if hasattr(adapter, "inject_monitor_config"):
             nested_config = adapter.inject_monitor_config(
-                nested_config, run_id=run.id, server_url="http://localhost:8000"
+                nested_config, run_id=run.id, server_url="http://localhost:8002"
             )
 
         yaml_content = adapter.config_to_yaml(nested_config)
@@ -167,7 +167,7 @@ class ExperimentRunner:
         # Environment variables for the training subprocess
         env = os.environ.copy()
         env["MONITOR_RUN_ID"] = str(run.id)
-        env["MONITOR_SERVER_URL"] = "http://localhost:8000"
+        env["MONITOR_SERVER_URL"] = "http://localhost:8002"
 
         try:
             process = await asyncio.create_subprocess_exec(

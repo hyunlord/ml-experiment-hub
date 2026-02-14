@@ -122,7 +122,7 @@ info "[6/6] Running health check..."
 
 RETRIES=10
 while [ $RETRIES -gt 0 ]; do
-    if curl -sf http://localhost:8000/api/system/health > /dev/null 2>&1; then
+    if curl -sf http://localhost:8002/api/system/health > /dev/null 2>&1; then
         info "  Backend healthy!"
         break
     fi
@@ -135,7 +135,7 @@ if [ $RETRIES -eq 0 ]; then
 fi
 
 # Show GPU info from the API
-GPU_INFO=$(curl -sf http://localhost:8000/api/system/gpu-info 2>/dev/null || echo '{}')
+GPU_INFO=$(curl -sf http://localhost:8002/api/system/gpu-info 2>/dev/null || echo '{}')
 if echo "$GPU_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"  GPU: {d['name']} ({d['vram_gb']} GB)\")" 2>/dev/null; then
     :
 fi
@@ -165,4 +165,4 @@ echo "     - Click 'New Experiment'"
 echo "     - Select preset: DGX Spark (configs/dgx_spark.yaml)"
 echo "     - Click 'Start Training'"
 echo ""
-echo "  API docs: http://localhost:8000/docs"
+echo "  API docs: http://localhost:8002/docs"

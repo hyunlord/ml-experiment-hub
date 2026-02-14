@@ -45,15 +45,15 @@ echo -e "${GREEN}Starting ML Experiment Hub (local dev)${NC}"
 echo "──────────────────────────────────────────"
 
 # Start backend
-echo -e "${GREEN}[backend]${NC} uvicorn on :8000"
-uv run uvicorn backend.main:app --reload --port 8000 2>&1 | sed "s/^/[backend] /" &
+echo -e "${GREEN}[backend]${NC} uvicorn on :8002"
+uv run uvicorn backend.main:app --reload --port 8002 2>&1 | sed "s/^/[backend] /" &
 
 # Start frontend
 echo -e "${GREEN}[frontend]${NC} vite on :5173"
 cd frontend && npm run dev 2>&1 | sed "s/^/[frontend] /" &
 
 echo "──────────────────────────────────────────"
-echo -e "${GREEN}Backend:${NC}  http://localhost:8000"
+echo -e "${GREEN}Backend:${NC}  http://localhost:8002"
 echo -e "${GREEN}Frontend:${NC} http://localhost:5173"
 echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
 echo "──────────────────────────────────────────"

@@ -159,7 +159,7 @@ function PreviewModal({
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
                 {sample._image_exists && sample._image_url ? (
                   <img
-                    src={`http://localhost:8000${sample._image_url}`}
+                    src={`http://localhost:8002${sample._image_url}`}
                     alt=""
                     className="h-full w-full object-cover"
                     onError={(e) => {

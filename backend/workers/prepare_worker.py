@@ -19,7 +19,7 @@ Config JSON:
         "raw_path": "coco/dataset_coco.json",
         "jsonl_path": "coco/coco_karpathy.jsonl",
         "raw_format": "coco_karpathy",
-        "server_url": "http://localhost:8000"
+        "server_url": "http://localhost:8002"
     }
 """
 
@@ -240,7 +240,7 @@ def main() -> int:
     raw_path = Path(data_dir) / config["raw_path"]
     jsonl_path = Path(data_dir) / config["jsonl_path"]
     raw_format = config.get("raw_format", "coco_karpathy")
-    server_url = config.get("server_url", "http://localhost:8000")
+    server_url = config.get("server_url", "http://localhost:8002")
 
     logger.info(
         "Starting prepare job %d: format=%s, raw=%s, out=%s",

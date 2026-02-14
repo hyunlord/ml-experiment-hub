@@ -127,12 +127,12 @@ def test_monitor_config_injection():
         "trainer": {"max_epochs": 10},
     }
 
-    injected = adapter.inject_monitor_config(config, run_id=42, server_url="http://localhost:8000")
+    injected = adapter.inject_monitor_config(config, run_id=42, server_url="http://localhost:8002")
 
     assert "monitor" in injected
     assert injected["monitor"]["enabled"] is True
     assert injected["monitor"]["run_id"] == 42
-    assert injected["monitor"]["server_url"] == "http://localhost:8000"
+    assert injected["monitor"]["server_url"] == "http://localhost:8002"
 
     print("✅ Monitor config injection works")
     return True
