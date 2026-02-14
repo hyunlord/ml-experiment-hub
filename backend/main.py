@@ -83,7 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             await session.commit()
 
         # Clean up stale queue entries
-        from backend.models.experiment import QueueEntry
+        from backend.models.experiment import DatasetDefinition, QueueEntry
         from shared.schemas import QueueStatus
 
         result = await session.execute(
@@ -95,6 +95,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 qe.status = QueueStatus.FAILED
                 qe.error_message = "Server restarted"
             await session.commit()
+
+        # Clean up stale prepare jobs on datasets
+        result = await session.execute(
+            select(DatasetDefinition).where(DatasetDefinition.prepare_job_id.is_not(None))  # type: ignore[union-attr]
+        )
+        stale_ds = result.scalars().all()
+        if stale_ds:
+            for ds in stale_ds:
+                ds.prepare_job_id = None
+            await session.commit()
+
+        # Seed dataset definitions
+        from backend.services.dataset_registry import seed_datasets
+
+        await seed_datasets(session)
 
     # Start system monitor service
     from backend.core.system_monitor import system_monitor

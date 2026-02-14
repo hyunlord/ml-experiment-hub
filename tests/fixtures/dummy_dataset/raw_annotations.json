@@ -1,0 +1,139 @@
+{
+  "images": [
+    {
+      "filename": "img_000.png",
+      "filepath": "",
+      "imgid": 0,
+      "sentids": [
+        0,
+        1
+      ],
+      "split": "train",
+      "sentences": [
+        {
+          "raw": "A red square image for testing",
+          "tokens": [
+            "a",
+            "square",
+            "image"
+          ]
+        },
+        {
+          "raw": "테스트용 빨간색 사각형 이미지",
+          "tokens": [
+            "테스트",
+            "이미지"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "img_001.png",
+      "filepath": "",
+      "imgid": 1,
+      "sentids": [
+        2,
+        3
+      ],
+      "split": "train",
+      "sentences": [
+        {
+          "raw": "A green square image for testing",
+          "tokens": [
+            "a",
+            "square",
+            "image"
+          ]
+        },
+        {
+          "raw": "테스트용 초록색 사각형 이미지",
+          "tokens": [
+            "테스트",
+            "이미지"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "img_002.png",
+      "filepath": "",
+      "imgid": 2,
+      "sentids": [
+        4,
+        5
+      ],
+      "split": "train",
+      "sentences": [
+        {
+          "raw": "A blue square image for testing",
+          "tokens": [
+            "a",
+            "square",
+            "image"
+          ]
+        },
+        {
+          "raw": "테스트용 파란색 사각형 이미지",
+          "tokens": [
+            "테스트",
+            "이미지"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "img_003.png",
+      "filepath": "",
+      "imgid": 3,
+      "sentids": [
+        6,
+        7
+      ],
+      "split": "val",
+      "sentences": [
+        {
+          "raw": "A yellow square image for testing",
+          "tokens": [
+            "a",
+            "square",
+            "image"
+          ]
+        },
+        {
+          "raw": "테스트용 노란색 사각형 이미지",
+          "tokens": [
+            "테스트",
+            "이미지"
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "img_004.png",
+      "filepath": "",
+      "imgid": 4,
+      "sentids": [
+        8,
+        9
+      ],
+      "split": "val",
+      "sentences": [
+        {
+          "raw": "A purple square image for testing",
+          "tokens": [
+            "a",
+            "square",
+            "image"
+          ]
+        },
+        {
+          "raw": "테스트용 보라색 사각형 이미지",
+          "tokens": [
+            "테스트",
+            "이미지"
+          ]
+        }
+      ]
+    }
+  ]
+}

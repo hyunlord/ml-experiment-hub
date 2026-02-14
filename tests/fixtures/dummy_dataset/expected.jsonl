@@ -1,0 +1,10 @@
+{"image": "img_000.png", "caption": "A red square image for testing", "split": "train"}
+{"image": "img_000.png", "caption": "테스트용 빨간색 사각형 이미지", "split": "train"}
+{"image": "img_001.png", "caption": "A green square image for testing", "split": "train"}
+{"image": "img_001.png", "caption": "테스트용 초록색 사각형 이미지", "split": "train"}
+{"image": "img_002.png", "caption": "A blue square image for testing", "split": "train"}
+{"image": "img_002.png", "caption": "테스트용 파란색 사각형 이미지", "split": "train"}
+{"image": "img_003.png", "caption": "A yellow square image for testing", "split": "val"}
+{"image": "img_003.png", "caption": "테스트용 노란색 사각형 이미지", "split": "val"}
+{"image": "img_004.png", "caption": "A purple square image for testing", "split": "val"}
+{"image": "img_004.png", "caption": "테스트용 보라색 사각형 이미지", "split": "val"}
