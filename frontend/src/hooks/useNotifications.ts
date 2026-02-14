@@ -38,7 +38,9 @@ export function useNotifications() {
     []
   )
 
-  useWebSocket('ws://localhost:8002/ws/notifications', {
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/notifications`
+
+  useWebSocket(wsUrl, {
     handlers: {
       run_started: (data: unknown) => {
         const d = data as {

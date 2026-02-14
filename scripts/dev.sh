@@ -46,7 +46,7 @@ echo "────────────────────────�
 
 # Start backend
 echo -e "${GREEN}[backend]${NC} uvicorn on :8002"
-uv run uvicorn backend.main:app --reload --port 8002 2>&1 | sed "s/^/[backend] /" &
+uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8002 2>&1 | sed "s/^/[backend] /" &
 
 # Start frontend
 echo -e "${GREEN}[frontend]${NC} vite on :5173"
