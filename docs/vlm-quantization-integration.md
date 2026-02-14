@@ -6,7 +6,7 @@ ml-experiment-hub와 vlm_quantization 프로젝트를 연동하여 학습을 관
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  ml-experiment-hub (port 8000)                              │
+│  ml-experiment-hub (port 8002)                              │
 │                                                             │
 │  ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐  │
 │  │ Experiment   │   │ Compat       │   │ WebSocket        │  │
@@ -81,7 +81,7 @@ CORS_ORIGINS=["http://localhost:5173"]
 # ml-experiment-hub 의존성 설치 + DB 마이그레이션 + 스키마 시딩
 ./scripts/setup.sh
 
-# 개발 서버 시작 (backend :8000 + frontend :5173)
+# 개발 서버 시작 (backend :8002 + frontend :5173)
 ./scripts/dev.sh
 ```
 
@@ -105,7 +105,7 @@ flat_config = {
 #    + monitor.server_url, monitor.run_id 자동 주입
 adapter = PyTorchLightningAdapter()
 config = unflatten_dict(flat_config)
-config = adapter.inject_monitor_config(config, run_id=42, server_url="http://localhost:8000")
+config = adapter.inject_monitor_config(config, run_id=42, server_url="http://localhost:8002")
 
 # 4. YAML 파일 생성
 yaml_content = adapter.config_to_yaml(config)
@@ -120,7 +120,7 @@ yaml_content = adapter.config_to_yaml(config)
 #     - coco_ko
 # monitor:
 #   enabled: true
-#   server_url: http://localhost:8000
+#   server_url: http://localhost:8002
 #   run_id: "42"
 #   log_every_n_steps: 10
 
@@ -269,12 +269,12 @@ data:
 
 monitor:
   enabled: true
-  server_url: http://localhost:8000
+  server_url: http://localhost:8002
   log_every_n_steps: 10
 EOF
 
 # 3. 먼저 hub에서 ExperimentRun을 API로 생성
-RUN_ID=$(curl -s -X POST http://localhost:8000/api/experiments \
+RUN_ID=$(curl -s -X POST http://localhost:8002/api/experiments \
   -H "Content-Type: application/json" \
   -d '{
     "name": "CLI Test Run",

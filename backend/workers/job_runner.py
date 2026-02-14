@@ -269,7 +269,7 @@ def main() -> None:
     job_type = job_config["job_type"]
     run_id = job_config["run_id"]
     config = job_config["config"]
-    server_url = job_config.get("server_url", "http://localhost:8000")
+    server_url = job_config.get("server_url", "http://localhost:8002")
 
     logger.info("Starting job %d (type=%s, run=%d)", job_id, job_type, run_id)
 

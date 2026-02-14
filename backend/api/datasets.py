@@ -328,7 +328,7 @@ async def prepare_dataset(
         "raw_path": ds.raw_path,
         "jsonl_path": ds.jsonl_path,
         "raw_format": ds.raw_format,
-        "server_url": "http://localhost:8000",
+        "server_url": "http://localhost:8002",
     }
 
     config_fd, config_path = tempfile.mkstemp(prefix=f"prepare_{job_id}_", suffix=".json")

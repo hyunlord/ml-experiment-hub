@@ -47,9 +47,9 @@ COPY alembic.ini ./
 # Install project itself (editable)
 RUN uv sync --frozen
 
-EXPOSE 8000
+EXPOSE 8002
 
-CMD ["uv", "run", "uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8002"]
 
 # ---------------------------------------------------------------------------
 # Stage: prod - Production with gunicorn + uvicorn workers
@@ -69,11 +69,11 @@ COPY alembic.ini ./
 # Install project itself
 RUN uv sync --frozen --no-dev
 
-EXPOSE 8000
+EXPOSE 8002
 
 # gunicorn with uvicorn workers for async support
 CMD ["uv", "run", "gunicorn", "backend.main:app", \
-     "--bind", "0.0.0.0:8000", \
+     "--bind", "0.0.0.0:8002", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--workers", "2", \
      "--timeout", "300", \

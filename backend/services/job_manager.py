@@ -196,7 +196,7 @@ class JobManager:
                     "job_type": job_type,
                     "run_id": job.run_id,
                     "config": job.config_json,
-                    "server_url": "http://localhost:8000",
+                    "server_url": "http://localhost:8002",
                 },
                 f,
             )

@@ -43,7 +43,7 @@ class PyTorchLightningAdapter(BaseAdapter):
     """
 
     def inject_monitor_config(
-        self, config: dict[str, Any], run_id: int, server_url: str = "http://localhost:8000"
+        self, config: dict[str, Any], run_id: int, server_url: str = "http://localhost:8002"
     ) -> dict[str, Any]:
         """Inject monitor settings so MonitorCallback reports to the hub.
 

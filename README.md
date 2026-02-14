@@ -64,7 +64,7 @@ git clone <repo-url> && cd ml-experiment-hub
 
 # 2. Start dev servers
 ./scripts/dev.sh
-# Backend: http://localhost:8000  (API docs: /docs)
+# Backend: http://localhost:8002  (API docs: /docs)
 # Frontend: http://localhost:5173
 ```
 
@@ -80,7 +80,7 @@ export PROJECTS_DIR=~/projects  # vlm_quantization source
 docker compose up -d --build
 
 # Dashboard: http://localhost:3000
-# API docs:  http://localhost:8000/docs
+# API docs:  http://localhost:8002/docs
 ```
 
 ## DGX Spark Setup

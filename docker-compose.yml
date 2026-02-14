@@ -12,7 +12,7 @@ services:
       target: prod
     container_name: ml-hub-backend
     ports:
-      - "8000:8000"
+      - "8002:8002"
     volumes:
       - ./data:/data                              # DB + logs (persistent)
       - ${PROJECTS_DIR:-./_projects}:/projects:ro  # ML project code (read-only)
@@ -41,7 +41,7 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/system/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8002/api/system/health"]
       interval: 30s
       timeout: 10s
       retries: 3

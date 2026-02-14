@@ -38,7 +38,7 @@ export function useNotifications() {
     []
   )
 
-  useWebSocket('ws://localhost:8000/ws/notifications', {
+  useWebSocket('ws://localhost:8002/ws/notifications', {
     handlers: {
       run_started: (data: unknown) => {
         const d = data as {

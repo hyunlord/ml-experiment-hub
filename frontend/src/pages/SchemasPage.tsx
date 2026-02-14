@@ -11,7 +11,7 @@ interface ConfigSchemaItem {
   updated_at: string
 }
 
-const API = 'http://localhost:8000/api/schemas'
+const API = 'http://localhost:8002/api/schemas'
 
 export default function SchemasPage() {
   const [schemas, setSchemas] = useState<ConfigSchemaItem[]>([])
