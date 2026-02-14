@@ -227,3 +227,44 @@ async def get_run_checkpoints(
         checkpoints=checkpoints,
         total_size_bytes=total_size,
     )
+
+
+@router.delete("/runs/{run_id}/checkpoints/{name:path}")
+async def delete_checkpoint(
+    run_id: int,
+    name: str,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, str]:
+    """Delete a specific checkpoint file for a run.
+
+    Args:
+        run_id: ID of the ExperimentRun.
+        name: Checkpoint filename (e.g. 'best.pt').
+        session: Database session.
+
+    Returns:
+        Status confirmation.
+
+    Raises:
+        HTTPException: If run/checkpoint not found or path traversal detected.
+    """
+    result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    if not run.checkpoint_path:
+        raise HTTPException(status_code=404, detail="No checkpoint path configured")
+
+    ckpt_dir = Path(run.checkpoint_path).resolve()
+    target = (ckpt_dir / name).resolve()
+
+    # Prevent directory traversal
+    if not str(target).startswith(str(ckpt_dir)):
+        raise HTTPException(status_code=400, detail="Invalid checkpoint name")
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Checkpoint file not found")
+
+    target.unlink()
+    return {"status": "ok", "deleted": name}

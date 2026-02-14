@@ -415,7 +415,7 @@ export default function ExperimentListPage() {
                     onClick={() => handleSort('best_metric')}
                     className="inline-flex items-center font-semibold text-muted-foreground hover:text-foreground"
                   >
-                    Best mAP
+                    Best Metric
                     <SortIcon col="best_metric" />
                   </button>
                 </th>
