@@ -69,7 +69,7 @@ class SystemMonitorService:
                                 await self._record_stats(
                                     run.id,
                                     stats,
-                                    session,  # type: ignore[arg-type]
+                                    session,
                                 )
                             await session.commit()
 
@@ -208,6 +208,15 @@ class SystemMonitorService:
         )
         session.add(stat)
 
+        # Check GPU temperatures for warnings
+        gpu_warnings: list[dict[str, Any]] = []
+        if stats.get("gpus"):
+            from backend.services.health_checks import check_gpu_temperatures
+
+            gpu_warnings = check_gpu_temperatures(stats["gpus"])
+            for w in gpu_warnings:
+                logger.warning("GPU temp alert for run %d: %s", run_id, w["message"])
+
         # Broadcast to WebSocket
         ws_data: dict[str, Any] = {
             "type": "system_stats",
@@ -221,6 +230,8 @@ class SystemMonitorService:
         }
         if stats.get("gpus"):
             ws_data["gpus"] = stats["gpus"]
+        if gpu_warnings:
+            ws_data["gpu_warnings"] = gpu_warnings
 
         await manager.broadcast(run_id, ws_data, channel="system")
 
