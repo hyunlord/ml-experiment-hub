@@ -28,7 +28,7 @@ services:
       - LOG_DIR=/data/logs
       - CONFIG_DIR=/tmp/configs
       - VENVS_DIR=/data/venvs
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["*"]
       - LOG_LEVEL=INFO
     deploy:
       resources:

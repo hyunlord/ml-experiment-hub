@@ -31,7 +31,7 @@ services:
       - LOG_DIR=/data/logs
       - CONFIG_DIR=/tmp/configs
       - VENVS_DIR=/data/venvs
-      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
+      - CORS_ORIGINS=["*"]
       - LOG_LEVEL=DEBUG
     command: ["uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8002"]
     deploy:
