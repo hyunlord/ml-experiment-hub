@@ -12,9 +12,11 @@ from backend.api import (
     experiments,
     jobs,
     metrics,
+    queue,
     runs,
     schemas,
     search,
+    settings as settings_api,
     studies,
     system,
 )
@@ -80,12 +82,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 study.status = JobStatus.FAILED
             await session.commit()
 
+        # Clean up stale queue entries
+        from backend.models.experiment import QueueEntry
+        from shared.schemas import QueueStatus
+
+        result = await session.execute(
+            select(QueueEntry).where(QueueEntry.status == QueueStatus.RUNNING)
+        )
+        stale_queue = result.scalars().all()
+        if stale_queue:
+            for qe in stale_queue:
+                qe.status = QueueStatus.FAILED
+                qe.error_message = "Server restarted"
+            await session.commit()
+
     # Start system monitor service
     from backend.core.system_monitor import system_monitor
 
     system_monitor.start()
 
+    # Start queue scheduler
+    from backend.services.queue_scheduler import queue_scheduler
+
+    queue_scheduler.start()
+
     yield
+
+    # Shutdown: Stop queue scheduler
+    from backend.services.queue_scheduler import queue_scheduler
+
+    queue_scheduler.stop()
 
     # Shutdown: Stop system monitor
     from backend.core.system_monitor import system_monitor
@@ -120,6 +146,8 @@ app.include_router(system.router)
 app.include_router(jobs.router)
 app.include_router(search.router)
 app.include_router(studies.router)
+app.include_router(queue.router)
+app.include_router(settings_api.router)
 
 
 @app.get("/")

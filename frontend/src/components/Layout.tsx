@@ -6,6 +6,7 @@ import {
   Cpu,
   FlaskConical,
   Home,
+  ListOrdered,
   Moon,
   Play,
   Search,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSidebarStore } from '@/stores/sidebarStore'
+import { useNotifications } from '@/hooks/useNotifications'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -60,6 +62,11 @@ function useNavItems(): NavItem[] {
       to: '/hyperparam',
       label: 'HP Search',
       icon: <SlidersHorizontal className="h-5 w-5" />,
+    },
+    {
+      to: '/queue',
+      label: 'Queue',
+      icon: <ListOrdered className="h-5 w-5" />,
     },
     {
       to: '/demo/search',
@@ -177,6 +184,7 @@ function TopBar() {
     if (path === '/hyperparam') return 'HP Search'
     if (path === '/hyperparam/new') return 'New HP Search'
     if (path.startsWith('/hyperparam/')) return 'HP Search Monitor'
+    if (path === '/queue') return 'Experiment Queue'
     if (path === '/demo/search') return 'Search Demo'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'
@@ -217,6 +225,9 @@ function TopBar() {
 
 export default function Layout({ children }: LayoutProps) {
   const { collapsed } = useSidebarStore()
+
+  // Connect to global notification WebSocket for browser Notification API
+  useNotifications()
 
   return (
     <div className="min-h-screen bg-background">

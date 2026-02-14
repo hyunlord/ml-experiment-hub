@@ -427,6 +427,30 @@ async def ws_logs(websocket: WebSocket, run_id: int) -> None:
         manager.disconnect(websocket, run_id, channel="logs")
 
 
+@router.websocket("/ws/notifications")
+async def ws_notifications(websocket: WebSocket) -> None:
+    """Global notification stream for browser Notification API.
+
+    Receives run_started, run_completed, run_failed events broadcast
+    by the notifier service on the (run_id=0, channel='notifications') room.
+    """
+    await manager.connect(websocket, 0, channel="notifications")
+    try:
+        while True:
+            try:
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=30.0)
+                if data == "ping":
+                    await manager.send_personal(websocket, {"type": "pong"})
+            except asyncio.TimeoutError:
+                await manager.send_personal(websocket, {"type": "keepalive"})
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        logger.exception("WebSocket notifications error")
+    finally:
+        manager.disconnect(websocket, 0, channel="notifications")
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
