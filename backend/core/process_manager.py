@@ -313,6 +313,11 @@ class ExperimentRunner:
         session: AsyncSession,
     ) -> None:
         """Monitor process stdout, parse metrics, and handle completion."""
+        from backend.services.health_checks import classify_error, detect_oom
+
+        oom_detected = False
+        last_lines: list[str] = []  # ring buffer of last 50 lines for error classification
+
         try:
             if process.stdout:
                 async for raw_line in process.stdout:
@@ -321,6 +326,25 @@ class ExperimentRunner:
                     # Write to log file
                     log_file.write(line + "\n")
                     log_file.flush()
+
+                    # Keep ring buffer for error classification
+                    last_lines.append(line)
+                    if len(last_lines) > 50:
+                        last_lines.pop(0)
+
+                    # OOM detection
+                    if not oom_detected and detect_oom(line):
+                        oom_detected = True
+                        logger.warning("OOM detected in run %d: %s", run_id, line)
+                        await ws_manager.broadcast(
+                            run_id,
+                            {
+                                "type": "run_error",
+                                "run_id": run_id,
+                                "error_type": "OOM",
+                                "message": "GPU out of memory detected",
+                            },
+                        )
 
                     # Try to parse metrics via adapter
                     metrics = adapter.parse_metrics(line)
@@ -337,6 +361,15 @@ class ExperimentRunner:
                 run.status = RunStatus.COMPLETED if return_code == 0 else RunStatus.FAILED
                 run.ended_at = datetime.utcnow()
 
+                # Classify error if failed
+                if run.status == RunStatus.FAILED and last_lines:
+                    error_class = classify_error("\n".join(last_lines))
+                    if error_class:
+                        run.metrics_summary = {
+                            **(run.metrics_summary or {}),
+                            "_error_class": error_class,
+                        }
+
                 # Auto-collect final metrics summary
                 await self._collect_final_metrics(run, session)
 
@@ -346,14 +379,14 @@ class ExperimentRunner:
                 await self._send_run_notification(run, session)
 
             # Notify via WebSocket
-            await ws_manager.broadcast(
-                run_id,
-                {
-                    "type": "run_completed",
-                    "run_id": run_id,
-                    "return_code": return_code,
-                },
-            )
+            ws_data: dict[str, Any] = {
+                "type": "run_completed",
+                "run_id": run_id,
+                "return_code": return_code,
+            }
+            if oom_detected:
+                ws_data["error_type"] = "OOM"
+            await ws_manager.broadcast(run_id, ws_data)
 
             logger.info("Run %d finished with code %d", run_id, return_code)
 

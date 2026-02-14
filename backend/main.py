@@ -24,13 +24,23 @@ from backend.config import settings
 from backend.models.database import init_db
 
 
+def _is_pid_alive(pid: int | None) -> bool:
+    """Check if a process with the given PID is still running."""
+    if pid is None:
+        return False
+    try:
+        import os
+
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown."""
-    # Startup: Initialize database
-    await init_db()
-
-    # Clean up stale runs from previous server session
+    import logging
     from datetime import datetime
 
     from sqlmodel import select
@@ -39,40 +49,67 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from backend.models.experiment import ExperimentRun, Job, OptunaStudy
     from shared.schemas import JobStatus, RunStatus
 
+    _logger = logging.getLogger(__name__)
+
+    # Startup: Initialize database (with WAL mode for SQLite)
+    await init_db()
+
+    # Enable WAL mode for SQLite
+    from backend.models.database import engine
+
+    if "sqlite" in str(engine.url):
+        async with engine.begin() as conn:
+            await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+            await conn.exec_driver_sql("PRAGMA synchronous=NORMAL")
+            _logger.info("SQLite WAL mode enabled")
+
     async with async_session_maker() as session:
+        # ── Recover or fail stale RUNNING runs ──
         result = await session.execute(
             select(ExperimentRun).where(ExperimentRun.status == RunStatus.RUNNING)
         )
         stale_runs = result.scalars().all()
-        if stale_runs:
-            for run in stale_runs:
+        recovered_count = 0
+        failed_count = 0
+        for run in stale_runs:
+            if _is_pid_alive(run.pid):
+                # Process still alive — log but leave as RUNNING
+                _logger.info(
+                    "Run %d (PID %d) still alive after restart, keeping RUNNING",
+                    run.id,
+                    run.pid,
+                )
+                recovered_count += 1
+            else:
                 run.status = RunStatus.FAILED
                 run.ended_at = datetime.utcnow()
+                failed_count += 1
+        if stale_runs:
             await session.commit()
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "Cleaned up %d stale RUNNING runs from previous server session",
-                len(stale_runs),
+            _logger.warning(
+                "Startup recovery: %d runs still alive, %d marked FAILED",
+                recovered_count,
+                failed_count,
             )
 
-        # Clean up stale jobs
+        # ── Recover or fail stale RUNNING jobs ──
         result = await session.execute(select(Job).where(Job.status == JobStatus.RUNNING))
         stale_jobs = result.scalars().all()
-        if stale_jobs:
-            for job in stale_jobs:
+        for job in stale_jobs:
+            if _is_pid_alive(job.pid):
+                _logger.info(
+                    "Job %d (PID %d) still alive after restart, keeping RUNNING",
+                    job.id,
+                    job.pid,
+                )
+            else:
                 job.status = JobStatus.FAILED
                 job.ended_at = datetime.utcnow()
-                job.error_message = "Server restarted"
+                job.error_message = "Server restarted — process not found"
+        if stale_jobs:
             await session.commit()
-            import logging
 
-            logging.getLogger(__name__).warning(
-                "Cleaned up %d stale RUNNING jobs from previous server session",
-                len(stale_jobs),
-            )
-
-        # Clean up stale optuna studies
+        # ── Fail stale optuna studies ──
         result = await session.execute(
             select(OptunaStudy).where(OptunaStudy.status == JobStatus.RUNNING)
         )
@@ -82,7 +119,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 study.status = JobStatus.FAILED
             await session.commit()
 
-        # Clean up stale queue entries
+        # ── Fail stale queue entries ──
         from backend.models.experiment import DatasetDefinition, QueueEntry
         from shared.schemas import QueueStatus
 
@@ -96,7 +133,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 qe.error_message = "Server restarted"
             await session.commit()
 
-        # Clean up stale prepare jobs on datasets
+        # ── Clean up stale prepare jobs on datasets ──
         result = await session.execute(
             select(DatasetDefinition).where(DatasetDefinition.prepare_job_id.is_not(None))  # type: ignore[union-attr]
         )
@@ -106,7 +143,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 ds.prepare_job_id = None
             await session.commit()
 
-        # Seed dataset definitions
+        # ── Seed dataset definitions ──
         from backend.services.dataset_registry import seed_datasets
 
         await seed_datasets(session)
@@ -121,7 +158,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     queue_scheduler.start()
 
+    # Start log archive service
+    from backend.services.log_manager import log_archive_service
+
+    log_archive_service.start()
+
     yield
+
+    # Shutdown: Stop log archive service
+    from backend.services.log_manager import log_archive_service
+
+    log_archive_service.stop()
 
     # Shutdown: Stop queue scheduler
     from backend.services.queue_scheduler import queue_scheduler

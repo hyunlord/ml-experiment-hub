@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import Index
 from sqlmodel import Column, Field, JSON, Relationship, SQLModel
 
 from shared.schemas import (
@@ -107,6 +108,7 @@ class MetricLog(SQLModel, table=True):
     """
 
     __tablename__ = "metric_logs"
+    __table_args__ = (Index("ix_metric_logs_run_step", "run_id", "step"),)
 
     id: int | None = Field(default=None, primary_key=True)
     run_id: int = Field(foreign_key="experiment_runs.id", index=True)

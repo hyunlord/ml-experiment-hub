@@ -1,6 +1,7 @@
-"""System information API for GPU detection and auto-configuration preview."""
+"""System information API for GPU detection, auto-config, and health checks."""
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter
 
@@ -129,3 +130,48 @@ async def gpu_info() -> dict[str, str | float | bool | dict[str, dict[str, int]]
         auto_config["unfrozen"] = {"batch_size": 32, "accumulate_grad_batches": 8, "num_workers": 2}
 
     return {**info, "auto_config": auto_config}
+
+
+@router.get("/health")
+async def health_check() -> dict[str, Any]:
+    """Health check endpoint for Docker healthcheck and monitoring.
+
+    Checks:
+    - Database connectivity
+    - Disk space
+    - Log directory stats
+
+    Returns:
+        Health status with component details.
+    """
+    from backend.models.database import async_session_maker
+    from backend.services.health_checks import check_disk_space
+    from backend.services.log_manager import get_log_dir_stats
+
+    checks: dict[str, Any] = {"status": "healthy"}
+    all_ok = True
+
+    # DB check
+    try:
+        async with async_session_maker() as session:
+            from sqlalchemy import text
+
+            await session.execute(text("SELECT 1"))
+        checks["database"] = {"status": "ok"}
+    except Exception as e:
+        checks["database"] = {"status": "error", "message": str(e)}
+        all_ok = False
+
+    # Disk check
+    disk = check_disk_space()
+    checks["disk"] = disk
+    if not disk["ok"]:
+        all_ok = False
+
+    # Log stats
+    checks["logs"] = get_log_dir_stats()
+
+    if not all_ok:
+        checks["status"] = "degraded"
+
+    return checks
