@@ -61,7 +61,6 @@ COPY shared/ ./shared/
 COPY adapters/ ./adapters/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
-COPY backend/seeds/ ./backend/seeds/ 2>/dev/null || true
 
 EXPOSE 8000
 
