@@ -80,6 +80,11 @@ function useNavItems(): NavItem[] {
       icon: <Search className="h-5 w-5" />,
     },
     {
+      to: '/system',
+      label: 'System',
+      icon: <Cpu className="h-5 w-5" />,
+    },
+    {
       to: '/schemas',
       label: 'Schemas',
       icon: <Wrench className="h-5 w-5" />,
@@ -193,6 +198,7 @@ function TopBar() {
     if (path === '/queue') return 'Experiment Queue'
     if (path === '/datasets') return 'Datasets'
     if (path === '/demo/search') return 'Search Demo'
+    if (path === '/system') return 'System Monitor'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'
     return 'ML Experiment Hub'

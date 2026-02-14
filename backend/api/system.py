@@ -132,6 +132,114 @@ async def gpu_info() -> dict[str, str | float | bool | dict[str, dict[str, int]]
     return {**info, "auto_config": auto_config}
 
 
+@router.get("/stats")
+async def system_stats() -> dict[str, Any]:
+    """Real-time system stats for the System Dashboard.
+
+    Returns GPU, CPU, RAM, and disk information without requiring
+    an active training run.
+    """
+    import asyncio
+    import shutil
+
+    stats: dict[str, Any] = {}
+
+    # --- GPU via nvidia-smi ---
+    if shutil.which("nvidia-smi"):
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "nvidia-smi",
+                "--query-gpu=index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,fan.speed,driver_version",
+                "--format=csv,noheader,nounits",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+            lines = stdout.decode().strip().split("\n")
+
+            gpus = []
+            for line in lines:
+                parts = [p.strip() for p in line.split(",")]
+                if len(parts) >= 6:
+                    mem_used = float(parts[3])
+                    mem_total = float(parts[4])
+                    gpus.append(
+                        {
+                            "index": int(parts[0]),
+                            "name": parts[1],
+                            "util": float(parts[2]),
+                            "memory_used_mb": mem_used,
+                            "memory_total_mb": mem_total,
+                            "memory_percent": round(mem_used / mem_total * 100, 1)
+                            if mem_total > 0
+                            else 0,
+                            "temperature": float(parts[5])
+                            if parts[5] not in ("[N/A]", "N/A", "")
+                            else None,
+                            "power_draw_w": float(parts[6])
+                            if len(parts) > 6 and parts[6] not in ("[N/A]", "N/A", "")
+                            else None,
+                            "fan_speed": float(parts[7])
+                            if len(parts) > 7 and parts[7] not in ("[N/A]", "N/A", "")
+                            else None,
+                            "driver_version": parts[8] if len(parts) > 8 else None,
+                        }
+                    )
+            stats["gpus"] = gpus
+        except Exception:
+            stats["gpus"] = []
+    else:
+        stats["gpus"] = []
+
+    # --- CPU ---
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "python",
+            "-c",
+            "import psutil,json;print(json.dumps({'percent':psutil.cpu_percent(interval=0.1),'count':psutil.cpu_count(),'freq':psutil.cpu_freq().current if psutil.cpu_freq() else None}))",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        import json
+
+        stats["cpu"] = json.loads(stdout.decode().strip())
+    except Exception:
+        stats["cpu"] = {"percent": None, "count": None, "freq": None}
+
+    # --- RAM ---
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "python",
+            "-c",
+            "import psutil,json;m=psutil.virtual_memory();print(json.dumps({'percent':m.percent,'used_gb':round(m.used/1024**3,1),'total_gb':round(m.total/1024**3,1)}))",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        import json
+
+        stats["ram"] = json.loads(stdout.decode().strip())
+    except Exception:
+        stats["ram"] = {"percent": None, "used_gb": None, "total_gb": None}
+
+    # --- Disk ---
+    try:
+        import shutil as _shutil
+
+        usage = _shutil.disk_usage("/")
+        stats["disk"] = {
+            "used_gb": round(usage.used / 1024**3, 1),
+            "total_gb": round(usage.total / 1024**3, 1),
+            "free_gb": round(usage.free / 1024**3, 1),
+            "percent": round(usage.used / usage.total * 100, 1),
+        }
+    except Exception:
+        stats["disk"] = {"used_gb": None, "total_gb": None, "free_gb": None, "percent": None}
+
+    return stats
+
+
 @router.get("/health")
 async def health_check() -> dict[str, Any]:
     """Health check endpoint for Docker healthcheck and monitoring.
