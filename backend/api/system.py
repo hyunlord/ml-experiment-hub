@@ -132,6 +132,58 @@ async def gpu_info() -> dict[str, str | float | bool | dict[str, dict[str, int]]
     return {**info, "auto_config": auto_config}
 
 
+async def _get_gpu_temp_fallback(gpu_index: int) -> float | None:
+    """Try alternative methods to get GPU temperature when nvidia-smi CSV returns N/A.
+
+    Fallback chain:
+    1. nvidia-smi -q (verbose output parsing)
+    2. /sys/class/thermal/ (Linux thermal zones)
+    """
+    import asyncio
+    import glob
+
+    # Method 1: nvidia-smi -q -i <index> (verbose query)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "nvidia-smi",
+            "-q",
+            "-i",
+            str(gpu_index),
+            "-d",
+            "TEMPERATURE",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=5.0)
+        for line in stdout.decode().split("\n"):
+            if "GPU Current Temp" in line:
+                parts = line.split(":")
+                if len(parts) >= 2:
+                    temp_str = parts[1].strip().replace(" C", "").strip()
+                    return float(temp_str)
+    except Exception:
+        pass
+
+    # Method 2: Linux thermal zones (common on ARM/Jetson/DGX Spark)
+    try:
+        for zone_dir in sorted(glob.glob("/sys/class/thermal/thermal_zone*")):
+            type_path = f"{zone_dir}/type"
+            temp_path = f"{zone_dir}/temp"
+            try:
+                with open(type_path) as f:
+                    zone_type = f.read().strip().lower()
+                if "gpu" in zone_type or "gpu-thermal" in zone_type:
+                    with open(temp_path) as f:
+                        raw = int(f.read().strip())
+                    return raw / 1000.0 if raw > 1000 else float(raw)
+            except (OSError, ValueError):
+                continue
+    except Exception:
+        pass
+
+    return None
+
+
 @router.get("/stats")
 async def system_stats() -> dict[str, Any]:
     """Real-time system stats for the System Dashboard.
@@ -185,6 +237,11 @@ async def system_stats() -> dict[str, Any]:
                             "driver_version": parts[8] if len(parts) > 8 else None,
                         }
                     )
+            # Fallback: if temperature is null, try thermal zones or nvidia-smi -q
+            for gpu in gpus:
+                if gpu["temperature"] is None:
+                    gpu["temperature"] = await _get_gpu_temp_fallback(gpu["index"])
+
             stats["gpus"] = gpus
         except Exception:
             stats["gpus"] = []
