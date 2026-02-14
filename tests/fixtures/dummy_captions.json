@@ -1,0 +1,38 @@
+{
+  "captions": [
+    "a cat sitting on a sofa",
+    "고양이가 소파에 앉아있다",
+    "a dog running in the park",
+    "sunset over the ocean with golden light",
+    "a red car parked on the street",
+    "fresh fruits on a wooden table",
+    "a person reading a book in a library",
+    "mountains covered in snow during winter",
+    "a cup of coffee on a desk",
+    "children playing in a playground"
+  ],
+  "image_paths": [
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_000.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_001.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_002.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_003.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_004.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_005.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_006.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_007.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_008.png",
+    "/Users/rexxa/github/ml-experiment-hub-wt/lead/tests/fixtures/dummy_images/img_009.png"
+  ],
+  "labels": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ]
+}

@@ -6,7 +6,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import compat, datasets, experiments, metrics, runs, schemas, system
+from backend.api import (
+    compat,
+    datasets,
+    experiments,
+    jobs,
+    metrics,
+    runs,
+    schemas,
+    search,
+    studies,
+    system,
+)
 from backend.config import settings
 from backend.models.database import init_db
 
@@ -23,8 +34,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from sqlmodel import select
 
     from backend.models.database import async_session_maker
-    from backend.models.experiment import ExperimentRun
-    from shared.schemas import RunStatus
+    from backend.models.experiment import ExperimentRun, Job, OptunaStudy
+    from shared.schemas import JobStatus, RunStatus
 
     async with async_session_maker() as session:
         result = await session.execute(
@@ -42,6 +53,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "Cleaned up %d stale RUNNING runs from previous server session",
                 len(stale_runs),
             )
+
+        # Clean up stale jobs
+        result = await session.execute(select(Job).where(Job.status == JobStatus.RUNNING))
+        stale_jobs = result.scalars().all()
+        if stale_jobs:
+            for job in stale_jobs:
+                job.status = JobStatus.FAILED
+                job.ended_at = datetime.utcnow()
+                job.error_message = "Server restarted"
+            await session.commit()
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Cleaned up %d stale RUNNING jobs from previous server session",
+                len(stale_jobs),
+            )
+
+        # Clean up stale optuna studies
+        result = await session.execute(
+            select(OptunaStudy).where(OptunaStudy.status == JobStatus.RUNNING)
+        )
+        stale_studies = result.scalars().all()
+        if stale_studies:
+            for study in stale_studies:
+                study.status = JobStatus.FAILED
+            await session.commit()
 
     # Start system monitor service
     from backend.core.system_monitor import system_monitor
@@ -80,6 +117,9 @@ app.include_router(runs.router)
 app.include_router(compat.router)
 app.include_router(datasets.router)
 app.include_router(system.router)
+app.include_router(jobs.router)
+app.include_router(search.router)
+app.include_router(studies.router)
 
 
 @app.get("/")

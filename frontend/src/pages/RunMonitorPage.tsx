@@ -10,6 +10,7 @@ import MetricsTab from '@/components/RunMonitor/MetricsTab'
 import SystemTab from '@/components/RunMonitor/SystemTab'
 import LogsTab from '@/components/RunMonitor/LogsTab'
 import HashAnalysisTab from '@/components/RunMonitor/HashAnalysisTab'
+import EvalTab from '@/components/RunMonitor/EvalTab'
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'system', label: 'System' },
   { id: 'logs', label: 'Logs' },
   { id: 'hash', label: 'Hash Analysis' },
+  { id: 'eval', label: 'Evaluation' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -140,6 +142,9 @@ export default function RunMonitorPage() {
         )}
         {activeTab === 'hash' && (
           <HashAnalysisTab metrics={metrics} hashDetails={hashDetails} />
+        )}
+        {activeTab === 'eval' && runId && (
+          <EvalTab runId={Number(runId)} />
         )}
       </div>
     </div>

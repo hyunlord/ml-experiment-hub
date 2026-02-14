@@ -9,6 +9,9 @@ import ExperimentComparePage from './pages/ExperimentComparePage'
 import SchemasPage from './pages/SchemasPage'
 import SettingsPage from './pages/SettingsPage'
 import RunningPage from './pages/RunningPage'
+import SearchDemoPage from './pages/SearchDemoPage'
+import HyperparamListPage from './pages/HyperparamListPage'
+import HyperparamSearchPage from './pages/HyperparamSearchPage'
 
 function App() {
   return (
@@ -23,8 +26,12 @@ function App() {
         <Route path="/compare" element={<ExperimentComparePage />} />
         <Route path="/experiments/compare" element={<ExperimentComparePage />} />
         <Route path="/running" element={<RunningPage />} />
+        <Route path="/hyperparam" element={<HyperparamListPage />} />
+        <Route path="/hyperparam/new" element={<HyperparamSearchPage />} />
+        <Route path="/hyperparam/:studyId" element={<HyperparamSearchPage />} />
         <Route path="/schemas" element={<SchemasPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/demo/search" element={<SearchDemoPage />} />
       </Routes>
     </Layout>
   )
