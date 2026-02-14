@@ -6,7 +6,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api import compat, datasets, experiments, jobs, metrics, runs, schemas, search, system
+from backend.api import (
+    compat,
+    datasets,
+    experiments,
+    jobs,
+    metrics,
+    runs,
+    schemas,
+    search,
+    studies,
+    system,
+)
 from backend.config import settings
 from backend.models.database import init_db
 
@@ -23,7 +34,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from sqlmodel import select
 
     from backend.models.database import async_session_maker
-    from backend.models.experiment import ExperimentRun, Job
+    from backend.models.experiment import ExperimentRun, Job, OptunaStudy
     from shared.schemas import JobStatus, RunStatus
 
     async with async_session_maker() as session:
@@ -58,6 +69,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 "Cleaned up %d stale RUNNING jobs from previous server session",
                 len(stale_jobs),
             )
+
+        # Clean up stale optuna studies
+        result = await session.execute(
+            select(OptunaStudy).where(OptunaStudy.status == JobStatus.RUNNING)
+        )
+        stale_studies = result.scalars().all()
+        if stale_studies:
+            for study in stale_studies:
+                study.status = JobStatus.FAILED
+            await session.commit()
 
     # Start system monitor service
     from backend.core.system_monitor import system_monitor
@@ -98,6 +119,7 @@ app.include_router(datasets.router)
 app.include_router(system.router)
 app.include_router(jobs.router)
 app.include_router(search.router)
+app.include_router(studies.router)
 
 
 @app.get("/")

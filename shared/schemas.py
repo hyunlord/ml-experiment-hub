@@ -32,6 +32,16 @@ class JobType(str, Enum):
 
     EVAL = "eval"
     INDEX_BUILD = "index_build"
+    OPTUNA_SEARCH = "optuna_search"
+
+
+class TrialStatus(str, Enum):
+    """Status of an Optuna trial."""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    PRUNED = "pruned"
+    FAILED = "failed"
 
 
 class JobStatus(str, Enum):

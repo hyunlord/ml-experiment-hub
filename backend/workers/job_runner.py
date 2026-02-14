@@ -278,6 +278,10 @@ def main() -> None:
             run_eval(job_id, run_id, config, server_url)
         elif job_type == "index_build":
             run_index_build(job_id, run_id, config, server_url)
+        elif job_type == "optuna_search":
+            from backend.workers.optuna_runner import run_optuna_search
+
+            run_optuna_search(job_id, config, server_url)
         else:
             raise ValueError(f"Unknown job type: {job_type}")
     except SystemExit:

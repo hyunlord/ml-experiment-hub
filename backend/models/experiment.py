@@ -5,7 +5,7 @@ from typing import Any
 
 from sqlmodel import Column, Field, JSON, Relationship, SQLModel
 
-from shared.schemas import ExperimentConfigStatus, JobStatus, JobType, RunStatus
+from shared.schemas import ExperimentConfigStatus, JobStatus, JobType, RunStatus, TrialStatus
 
 
 class ConfigSchema(SQLModel, table=True):
@@ -162,3 +162,71 @@ class Job(SQLModel, table=True):
 
     # Relationships
     run: ExperimentRun = Relationship()
+
+
+class OptunaStudy(SQLModel, table=True):
+    """Optuna hyperparameter search study.
+
+    Stores search space definition, optuna settings, and links to the
+    config schema used for trial configs. The job system manages the
+    subprocess lifecycle.
+    """
+
+    __tablename__ = "optuna_studies"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    config_schema_id: int | None = Field(default=None, foreign_key="config_schemas.id")
+    base_config_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Fixed config values (non-search params)",
+    )
+    search_space_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Search space: {param_key: {type, low, high, ...}}",
+    )
+    n_trials: int = Field(default=20, ge=1)
+    search_epochs: int = Field(default=5, ge=1, description="Epochs per trial")
+    subset_ratio: float = Field(default=0.1, ge=0.01, le=1.0)
+    pruner: str = Field(default="median", description="Optuna pruner: median|hyperband|none")
+    objective_metric: str = Field(default="val/map_i2t", description="Metric to optimize")
+    direction: str = Field(default="maximize", description="maximize or minimize")
+    status: JobStatus = Field(default=JobStatus.PENDING)
+    best_trial_number: int | None = Field(default=None)
+    best_value: float | None = Field(default=None)
+    job_id: int | None = Field(default=None, foreign_key="jobs.id")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime | None = Field(default=None)
+
+    # Relationships
+    config_schema: ConfigSchema | None = Relationship()
+    trials: list["OptunaTrialResult"] = Relationship(back_populates="study")
+
+
+class OptunaTrialResult(SQLModel, table=True):
+    """Result of a single Optuna trial."""
+
+    __tablename__ = "optuna_trial_results"
+
+    id: int | None = Field(default=None, primary_key=True)
+    study_id: int = Field(foreign_key="optuna_studies.id", index=True)
+    trial_number: int = Field(ge=0)
+    params_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Hyperparameters sampled for this trial",
+    )
+    objective_value: float | None = Field(default=None)
+    status: TrialStatus = Field(default=TrialStatus.RUNNING)
+    duration_seconds: float | None = Field(default=None)
+    intermediate_values_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Intermediate objective values {step: value}",
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    study: OptunaStudy = Relationship(back_populates="trials")

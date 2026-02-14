@@ -10,6 +10,7 @@ import {
   Play,
   Search,
   Settings,
+  SlidersHorizontal,
   Sun,
   Wrench,
 } from 'lucide-react'
@@ -54,6 +55,11 @@ function useNavItems(): NavItem[] {
       label: 'Running',
       icon: <Play className="h-5 w-5" />,
       badge: runningCount || null,
+    },
+    {
+      to: '/hyperparam',
+      label: 'HP Search',
+      icon: <SlidersHorizontal className="h-5 w-5" />,
     },
     {
       to: '/demo/search',
@@ -168,6 +174,9 @@ function TopBar() {
     if (path.startsWith('/runs/')) return 'Run Monitor'
     if (path === '/compare' || path.startsWith('/compare?')) return 'Compare'
     if (path === '/running') return 'Running'
+    if (path === '/hyperparam') return 'HP Search'
+    if (path === '/hyperparam/new') return 'New HP Search'
+    if (path.startsWith('/hyperparam/')) return 'HP Search Monitor'
     if (path === '/demo/search') return 'Search Demo'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'
