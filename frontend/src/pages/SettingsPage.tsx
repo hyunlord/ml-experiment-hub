@@ -13,7 +13,7 @@ export default function SettingsPage() {
   const [local, setLocal] = useState<LocalSettings>({
     dataRoot: './data',
     experimentDir: './experiments',
-    apiUrl: 'http://localhost:8002',
+    apiUrl: window.location.origin,
     gpuIds: '',
   })
   const [hub, setHub] = useState<HubSettings>({
