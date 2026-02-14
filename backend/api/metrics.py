@@ -432,8 +432,6 @@ async def ws_logs(websocket: WebSocket, run_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-
-
 @asynccontextmanager
 async def _get_session_ctx() -> AsyncGenerator[AsyncSession, None]:
     """Create a standalone async session for WebSocket handlers.

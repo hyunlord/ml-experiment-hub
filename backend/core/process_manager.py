@@ -328,6 +328,10 @@ class ExperimentRunner:
             if run and run.status == RunStatus.RUNNING:
                 run.status = RunStatus.COMPLETED if return_code == 0 else RunStatus.FAILED
                 run.ended_at = datetime.utcnow()
+
+                # Auto-collect final metrics summary
+                await self._collect_final_metrics(run, session)
+
                 await session.commit()
 
             # Notify via WebSocket
@@ -385,6 +389,63 @@ class ExperimentRunner:
                 "metrics": metrics_json,
                 "timestamp": datetime.utcnow().isoformat(),
             },
+        )
+
+    async def _collect_final_metrics(
+        self,
+        run: ExperimentRun,
+        session: AsyncSession,
+    ) -> None:
+        """Aggregate final metrics from MetricLog entries into metrics_summary.
+
+        Collects the last recorded value for each metric key and adds
+        training duration. Called automatically when a run finishes.
+        """
+        run_id = run.id
+        result = await session.execute(
+            select(MetricLog).where(MetricLog.run_id == run_id).order_by(MetricLog.step)
+        )
+        logs = result.scalars().all()
+
+        if not logs:
+            # No metrics recorded — still store duration
+            duration = None
+            if run.started_at and run.ended_at:
+                duration = (run.ended_at - run.started_at).total_seconds()
+            run.metrics_summary = {"_duration_seconds": duration, "_total_steps": 0}
+            return
+
+        # Build last-value map: for each metric key, keep the last value seen
+        last_values: dict[str, Any] = {}
+        max_step = 0
+        max_epoch: int | None = None
+        for log in logs:
+            for k, v in (log.metrics_json or {}).items():
+                last_values[k] = v
+            if log.step > max_step:
+                max_step = log.step
+            if log.epoch is not None:
+                max_epoch = log.epoch
+
+        # Calculate duration
+        duration = None
+        if run.started_at and run.ended_at:
+            duration = (run.ended_at - run.started_at).total_seconds()
+
+        # Build summary
+        summary: dict[str, Any] = {**last_values}
+        summary["_duration_seconds"] = duration
+        summary["_total_steps"] = max_step
+        if max_epoch is not None:
+            summary["_total_epochs"] = max_epoch
+        summary["_num_metric_logs"] = len(logs)
+
+        run.metrics_summary = summary
+        logger.info(
+            "Collected metrics_summary for run %d: %d keys, %d steps",
+            run_id,
+            len(last_values),
+            max_step,
         )
 
     def _cleanup_run(self, run_id: int) -> None:
