@@ -33,7 +33,11 @@ async def list_experiments(
     """List experiment configurations with pagination and filters."""
     service = ExperimentService(session)
     experiments = await service.list_experiments(
-        skip=skip, limit=limit, status=status, schema_id=schema_id, tags=tags,
+        skip=skip,
+        limit=limit,
+        status=status,
+        schema_id=schema_id,
+        tags=tags,
     )
     total = await service.count_experiments(status=status, schema_id=schema_id)
     return ExperimentListResponse(
@@ -172,7 +176,9 @@ async def dry_run_experiment(
     if "training" in nested_config and isinstance(nested_config["training"], dict):
         batch_size = nested_config["training"].get("batch_size")
         if batch_size == "auto":
-            warnings.append("training.batch_size set to 'auto' - will be resolved at runtime based on GPU memory")
+            warnings.append(
+                "training.batch_size set to 'auto' - will be resolved at runtime based on GPU memory"
+            )
 
     return DryRunResponse(
         config_yaml=config_yaml,

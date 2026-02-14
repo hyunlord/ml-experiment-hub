@@ -55,7 +55,9 @@ async def dataset_status() -> dict[str, dict[str, str | int | bool | None]]:
     for key, info in DATASET_REGISTRY.items():
         check_path = data_dir / info["check_path"]
         available = check_path.exists()
-        entries = _count_jsonl_lines(check_path) if available and check_path.suffix == ".jsonl" else None
+        entries = (
+            _count_jsonl_lines(check_path) if available and check_path.suffix == ".jsonl" else None
+        )
 
         result[key] = {
             "available": available,

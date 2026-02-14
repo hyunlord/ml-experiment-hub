@@ -85,6 +85,7 @@ def _compute_auto_config(vram_gb: float, unified: bool, freeze_backbone: bool) -
         accum = max(1, -(-target_effective_batch // batch_size))
 
     import os
+
     cpu_count = os.cpu_count() or 4
     worker_cap = 12 if unified else 8
     num_workers = min(cpu_count, worker_cap, max(2, batch_size // 32))
@@ -114,10 +115,14 @@ async def gpu_info() -> dict[str, str | float | bool | dict[str, dict[str, int]]
     auto_config = {}
     if info["available"]:
         auto_config["frozen"] = _compute_auto_config(
-            vram_gb, unified, freeze_backbone=True,
+            vram_gb,
+            unified,
+            freeze_backbone=True,
         )
         auto_config["unfrozen"] = _compute_auto_config(
-            vram_gb, unified, freeze_backbone=False,
+            vram_gb,
+            unified,
+            freeze_backbone=False,
         )
     else:
         auto_config["frozen"] = {"batch_size": 32, "accumulate_grad_batches": 8, "num_workers": 2}

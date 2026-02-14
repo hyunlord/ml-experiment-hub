@@ -233,15 +233,7 @@ def test_flatten_unflatten_empty_dict() -> None:
 
 def test_flatten_unflatten_deeply_nested() -> None:
     """Test that deeply nested dicts (3+ levels) round-trip correctly."""
-    original = {
-        "level1": {
-            "level2": {
-                "level3": {
-                    "value": 42
-                }
-            }
-        }
-    }
+    original = {"level1": {"level2": {"level3": {"value": 42}}}}
 
     flat = flatten_dict(original)
     assert flat == {"level1.level2.level3.value": 42}
@@ -252,12 +244,7 @@ def test_flatten_unflatten_deeply_nested() -> None:
 
 def test_flatten_unflatten_preserves_list_values() -> None:
     """Test that list values survive round-trip."""
-    original = {
-        "model": {
-            "bit_list": [8, 16, 32, 48, 64, 128],
-            "layers": [1, 2, 3]
-        }
-    }
+    original = {"model": {"bit_list": [8, 16, 32, 48, 64, 128], "layers": [1, 2, 3]}}
 
     flat = flatten_dict(original)
     roundtrip = unflatten_dict(flat)
@@ -269,14 +256,7 @@ def test_flatten_unflatten_preserves_list_values() -> None:
 
 def test_flatten_unflatten_preserves_boolean_values() -> None:
     """Test that boolean values survive round-trip."""
-    original = {
-        "model": {
-            "freeze_backbone": True
-        },
-        "monitor": {
-            "enabled": False
-        }
-    }
+    original = {"model": {"freeze_backbone": True}, "monitor": {"enabled": False}}
 
     flat = flatten_dict(original)
     roundtrip = unflatten_dict(flat)
@@ -288,11 +268,7 @@ def test_flatten_unflatten_preserves_boolean_values() -> None:
 
 def test_flatten_unflatten_preserves_string_auto() -> None:
     """Test that string 'auto' survives round-trip."""
-    original = {
-        "training": {
-            "batch_size": "auto"
-        }
-    }
+    original = {"training": {"batch_size": "auto"}}
 
     flat = flatten_dict(original)
     roundtrip = unflatten_dict(flat)
@@ -304,13 +280,7 @@ def test_flatten_unflatten_preserves_string_auto() -> None:
 
 def test_flatten_unflatten_preserves_float_precision() -> None:
     """Test that float values maintain precision through round-trip."""
-    original = {
-        "loss": {
-            "temperature": 0.07,
-            "weight_decay": 0.01,
-            "lr": 5e-6
-        }
-    }
+    original = {"loss": {"temperature": 0.07, "weight_decay": 0.01, "lr": 5e-6}}
 
     flat = flatten_dict(original)
     roundtrip = unflatten_dict(flat)
@@ -330,9 +300,7 @@ def test_flatten_unflatten_mixed_types() -> None:
             "count": 42,
             "ratio": 0.5,
             "items": [1, 2, 3],
-            "nested": {
-                "value": "deep"
-            }
+            "nested": {"value": "deep"},
         }
     }
 
@@ -351,11 +319,7 @@ def test_adapter_config_to_yaml_handles_string_batch_size() -> None:
     """Test that string batch_size '128' is converted to int 128 in YAML."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "training": {
-            "batch_size": "128"
-        }
-    }
+    config = {"training": {"batch_size": "128"}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)
@@ -368,11 +332,7 @@ def test_adapter_config_to_yaml_preserves_auto_batch_size() -> None:
     """Test that 'auto' batch_size stays as string in YAML."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "training": {
-            "batch_size": "auto"
-        }
-    }
+    config = {"training": {"batch_size": "auto"}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)
@@ -385,11 +345,7 @@ def test_adapter_config_to_yaml_preserves_int_batch_size() -> None:
     """Test that int batch_size stays as int in YAML."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "training": {
-            "batch_size": 128
-        }
-    }
+    config = {"training": {"batch_size": 128}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)
@@ -407,11 +363,7 @@ def test_adapter_resolves_dataset_ids_to_paths() -> None:
     """Test that dataset IDs are converted to full path dicts in YAML."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "data": {
-            "extra_datasets": ["coco_ko", "aihub"]
-        }
-    }
+    config = {"data": {"extra_datasets": ["coco_ko", "aihub"]}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)
@@ -433,10 +385,7 @@ def test_adapter_passes_through_resolved_dicts() -> None:
     config = {
         "data": {
             "extra_datasets": [
-                {
-                    "jsonl_path": "/custom/path/data.jsonl",
-                    "data_root": "/custom/root"
-                }
+                {"jsonl_path": "/custom/path/data.jsonl", "data_root": "/custom/root"}
             ]
         }
     }
@@ -454,11 +403,7 @@ def test_adapter_handles_empty_extra_datasets() -> None:
     """Test that empty extra_datasets list is removed from YAML."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "data": {
-            "extra_datasets": []
-        }
-    }
+    config = {"data": {"extra_datasets": []}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)
@@ -472,11 +417,7 @@ def test_adapter_resolves_all_registry_entries() -> None:
     """Test resolution for all entries in DATASET_REGISTRY."""
     adapter = PyTorchLightningAdapter()
 
-    config = {
-        "data": {
-            "extra_datasets": list(DATASET_REGISTRY.keys())
-        }
-    }
+    config = {"data": {"extra_datasets": list(DATASET_REGISTRY.keys())}}
 
     yaml_str = adapter.config_to_yaml(config)
     parsed = yaml.safe_load(yaml_str)

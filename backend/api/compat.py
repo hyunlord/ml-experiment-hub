@@ -135,8 +135,17 @@ def _extract_metrics(payload: BaseModel, exclude: set[str] | None = None) -> dic
 
     Excludes known non-metric fields like run_id, epoch, step, config.
     """
-    skip = {"run_id", "epoch", "step", "config", "is_training",
-            "total_epochs", "total_steps", "path", "val_loss"}
+    skip = {
+        "run_id",
+        "epoch",
+        "step",
+        "config",
+        "is_training",
+        "total_epochs",
+        "total_steps",
+        "path",
+        "val_loss",
+    }
     if exclude:
         skip |= exclude
     data = payload.model_dump(exclude_none=True)
@@ -212,9 +221,7 @@ async def compat_training_status(
 
     # If training ended, update run status
     if not body.is_training:
-        result = await session.execute(
-            select(ExperimentRun).where(ExperimentRun.id == run_id)
-        )
+        result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
         run = result.scalar_one_or_none()
         if run and run.status == RunStatus.RUNNING:
             run.status = RunStatus.COMPLETED
@@ -337,7 +344,9 @@ async def compat_checkpoint_register(body: CheckpointPayload) -> dict[str, str]:
     """Bridge: MonitorCallback checkpoint registration (ack only)."""
     logger.info(
         "Checkpoint registered: run=%s epoch=%d path=%s",
-        body.run_id, body.epoch, body.path,
+        body.run_id,
+        body.epoch,
+        body.path,
     )
     return {"status": "ok"}
 

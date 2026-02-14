@@ -39,9 +39,7 @@ def unflatten_dict(flat: dict[str, Any]) -> dict[str, Any]:
     return nested
 
 
-def diff_configs(
-    base: dict[str, Any], other: dict[str, Any]
-) -> dict[str, dict[str, Any]]:
+def diff_configs(base: dict[str, Any], other: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Compare two flat config dicts and return differences.
 
     Returns:

@@ -87,9 +87,7 @@ class SystemMonitor:
 
         return snapshot
 
-    async def start_monitoring(
-        self, run_id: int, interval: float = 1.0
-    ) -> None:
+    async def start_monitoring(self, run_id: int, interval: float = 1.0) -> None:
         """Start background monitoring for a run.
 
         Args:
@@ -194,23 +192,23 @@ def _collect_gpu_stats() -> list[dict[str, Any]]:
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
 
             try:
-                temp = pynvml.nvmlDeviceGetTemperature(
-                    handle, pynvml.NVML_TEMPERATURE_GPU
-                )
+                temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
             except Exception:
                 temp = None
 
-            gpus.append({
-                "index": i,
-                "name": name,
-                "util": util.gpu,
-                "memory_used_mb": round(mem_info.used / (1024**2), 1),
-                "memory_total_mb": round(mem_info.total / (1024**2), 1),
-                "memory_percent": round(mem_info.used / mem_info.total * 100, 1)
-                if mem_info.total > 0
-                else 0,
-                "temperature": temp,
-            })
+            gpus.append(
+                {
+                    "index": i,
+                    "name": name,
+                    "util": util.gpu,
+                    "memory_used_mb": round(mem_info.used / (1024**2), 1),
+                    "memory_total_mb": round(mem_info.total / (1024**2), 1),
+                    "memory_percent": round(mem_info.used / mem_info.total * 100, 1)
+                    if mem_info.total > 0
+                    else 0,
+                    "temperature": temp,
+                }
+            )
     except Exception:
         logger.debug("GPU stats collection failed", exc_info=True)
 

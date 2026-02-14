@@ -8,7 +8,6 @@ with its config written to a temporary YAML file.
 import asyncio
 import logging
 import os
-import signal
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -135,7 +134,7 @@ class ExperimentRunner:
         nested_config = unflatten_dict(experiment.config_json or {})
 
         # Inject monitor config so MonitorCallback reports to hub
-        if hasattr(adapter, 'inject_monitor_config'):
+        if hasattr(adapter, "inject_monitor_config"):
             nested_config = adapter.inject_monitor_config(
                 nested_config, run_id=run.id, server_url="http://localhost:8000"
             )
@@ -198,9 +197,7 @@ class ExperimentRunner:
         self._config_files[run.id] = config_path
 
         # Start background monitoring
-        monitor = asyncio.create_task(
-            self._monitor(run.id, process, adapter, log_file, session)
-        )
+        monitor = asyncio.create_task(self._monitor(run.id, process, adapter, log_file, session))
         self._monitors[run.id] = monitor
 
         return run
@@ -241,9 +238,7 @@ class ExperimentRunner:
                 pass
 
         # Update DB
-        result = await session.execute(
-            select(ExperimentRun).where(ExperimentRun.id == run_id)
-        )
+        result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
         run = result.scalar_one_or_none()
         if run:
             run.status = RunStatus.CANCELLED
@@ -266,11 +261,7 @@ class ExperimentRunner:
 
     def list_active(self) -> list[int]:
         """Return run IDs of all currently active processes."""
-        return [
-            run_id
-            for run_id, proc in self._processes.items()
-            if proc.returncode is None
-        ]
+        return [run_id for run_id, proc in self._processes.items() if proc.returncode is None]
 
     async def cleanup(self, session: AsyncSession) -> int:
         """Clean up zombie processes and stale state.
@@ -289,9 +280,7 @@ class ExperimentRunner:
                 dead_runs.append(run_id)
 
         for run_id in dead_runs:
-            result = await session.execute(
-                select(ExperimentRun).where(ExperimentRun.id == run_id)
-            )
+            result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
             run = result.scalar_one_or_none()
             if run and run.status == RunStatus.RUNNING:
                 return_code = self._processes[run_id].returncode
@@ -334,9 +323,7 @@ class ExperimentRunner:
             return_code = await process.wait()
 
             # Update run status
-            result = await session.execute(
-                select(ExperimentRun).where(ExperimentRun.id == run_id)
-            )
+            result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
             run = result.scalar_one_or_none()
             if run and run.status == RunStatus.RUNNING:
                 run.status = RunStatus.COMPLETED if return_code == 0 else RunStatus.FAILED
@@ -359,9 +346,7 @@ class ExperimentRunner:
             pass
         except Exception:
             logger.exception("Error monitoring run %d", run_id)
-            await ws_manager.broadcast(
-                run_id, {"type": "run_error", "run_id": run_id}
-            )
+            await ws_manager.broadcast(run_id, {"type": "run_error", "run_id": run_id})
         finally:
             log_file.close()
             self._cleanup_run(run_id)
@@ -375,9 +360,7 @@ class ExperimentRunner:
         """Persist a metric and broadcast via WebSocket."""
         step = metric_data["step"]
         epoch = metric_data.get("epoch")
-        metrics_json = {
-            k: v for k, v in metric_data.items() if k not in ("step", "epoch")
-        }
+        metrics_json = {k: v for k, v in metric_data.items() if k not in ("step", "epoch")}
 
         if not metrics_json:
             return

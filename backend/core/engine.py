@@ -45,9 +45,7 @@ class ExperimentEngine:
         self.running_processes[run_id] = process
 
         # Start monitoring task
-        task = asyncio.create_task(
-            self._monitor_process(run_id, process, session)
-        )
+        task = asyncio.create_task(self._monitor_process(run_id, process, session))
         self.monitoring_tasks[run_id] = task
 
     async def stop_experiment(self, run_id: int) -> bool:
@@ -98,9 +96,7 @@ class ExperimentEngine:
                         match = metric_pattern.search(line_str)
                         if match:
                             metric_data = json.loads(match.group())
-                            await self._process_metric(
-                                run_id, metric_data, session
-                            )
+                            await self._process_metric(run_id, metric_data, session)
                     except Exception:
                         # Ignore parsing errors, continue monitoring
                         continue
@@ -150,11 +146,7 @@ class ExperimentEngine:
             return
 
         # Extract all metrics (excluding 'step' and 'epoch')
-        metrics_json = {
-            k: v
-            for k, v in metric_data.items()
-            if k not in ("step", "epoch")
-        }
+        metrics_json = {k: v for k, v in metric_data.items() if k not in ("step", "epoch")}
 
         if not metrics_json:
             return

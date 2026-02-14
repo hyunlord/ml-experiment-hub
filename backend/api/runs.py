@@ -78,9 +78,7 @@ async def get_run(
     Raises:
         HTTPException: If run not found.
     """
-    result = await session.execute(
-        select(ExperimentRun).where(ExperimentRun.id == run_id)
-    )
+    result = await session.execute(select(ExperimentRun).where(ExperimentRun.id == run_id))
     run = result.scalar_one_or_none()
     if not run:
         raise HTTPException(status_code=404, detail="Run not found")
