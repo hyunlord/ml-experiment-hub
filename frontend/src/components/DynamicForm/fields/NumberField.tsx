@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
 import type { FieldProps } from '@/types/schema'
 
-export default function NumberField({ field, value, onChange, disabled }: FieldProps) {
+export default function NumberField({ field, value, onChange, disabled, dependencyState }: FieldProps) {
   const [error, setError] = useState('')
+  const isDepDisabled = disabled || (dependencyState?.disabled ?? false)
 
   const handleChange = (raw: string) => {
     if (raw === '' || raw === '-') {
@@ -34,7 +36,7 @@ export default function NumberField({ field, value, onChange, disabled }: FieldP
           type="number"
           value={value !== undefined && value !== null ? String(value) : (field.default_value !== undefined ? String(field.default_value) : '')}
           onChange={(e) => handleChange(e.target.value)}
-          disabled={disabled}
+          disabled={isDepDisabled}
           min={field.min}
           max={field.max}
           step={field.step ?? 'any'}
@@ -47,7 +49,15 @@ export default function NumberField({ field, value, onChange, disabled }: FieldP
         )}
       </div>
       {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
-      {!error && field.description && (
+      {!error && dependencyState?.hint && (
+        <p className={cn(
+          'mt-1 text-xs font-medium',
+          dependencyState.disabled ? 'text-amber-500' : 'text-blue-500'
+        )}>
+          {dependencyState.hint}
+        </p>
+      )}
+      {!error && !dependencyState?.hint && field.description && (
         <p className="mt-1 text-xs text-muted-foreground">{field.description}</p>
       )}
     </div>

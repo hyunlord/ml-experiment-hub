@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Radio, Wifi, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRunWebSocket } from '@/hooks/useRunWebSocket'
-import type { MetricMessage, SystemMessage, LogMessage } from '@/components/RunMonitor/types'
+import type { MetricMessage, SystemMessage, LogMessage, HashAnalysisDetailMessage } from '@/components/RunMonitor/types'
 import OverviewTab from '@/components/RunMonitor/OverviewTab'
 import LossCurvesTab from '@/components/RunMonitor/LossCurvesTab'
 import MetricsTab from '@/components/RunMonitor/MetricsTab'
@@ -28,10 +28,11 @@ export default function RunMonitorPage() {
   const [activeTab, setActiveTab] = useState<TabId>('overview')
 
   // Three independent WebSocket channels
+  // Raw messages from metrics channel (includes both metric and hash_analysis_detail)
   const {
-    data: metrics,
+    data: rawMetricsData,
     isConnected: metricsConnected,
-  } = useRunWebSocket<MetricMessage>(runId ?? null, 'metrics')
+  } = useRunWebSocket<MetricMessage | HashAnalysisDetailMessage>(runId ?? null, 'metrics')
 
   const {
     data: systemData,
@@ -42,6 +43,16 @@ export default function RunMonitorPage() {
     data: logs,
     isConnected: logsConnected,
   } = useRunWebSocket<LogMessage>(runId ?? null, 'logs')
+
+  // Split by type
+  const metrics = useMemo(
+    () => rawMetricsData.filter((m): m is MetricMessage => m.type === 'metric'),
+    [rawMetricsData],
+  )
+  const hashDetails = useMemo(
+    () => rawMetricsData.filter((m): m is HashAnalysisDetailMessage => m.type === 'hash_analysis_detail'),
+    [rawMetricsData],
+  )
 
   const anyConnected = metricsConnected || systemConnected || logsConnected
 
@@ -128,7 +139,7 @@ export default function RunMonitorPage() {
           <LogsTab logs={logs} />
         )}
         {activeTab === 'hash' && (
-          <HashAnalysisTab metrics={metrics} />
+          <HashAnalysisTab metrics={metrics} hashDetails={hashDetails} />
         )}
       </div>
     </div>

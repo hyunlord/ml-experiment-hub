@@ -115,3 +115,13 @@ class MetricLogResponse(BaseModel):
         """Pydantic configuration."""
 
         from_attributes = True
+
+
+class DryRunResponse(BaseModel):
+    """Schema for experiment dry-run response."""
+
+    config_yaml: str
+    command: list[str]
+    working_dir: str
+    effective_config: dict[str, Any]
+    warnings: list[str]

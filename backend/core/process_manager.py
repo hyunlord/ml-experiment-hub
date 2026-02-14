@@ -116,20 +116,7 @@ class ExperimentRunner:
         except RuntimeError as e:
             raise ValueError(f"Failed to set up project environment: {e}") from e
 
-        # Convert flat dot-notation config → nested dict → YAML
-        nested_config = unflatten_dict(experiment.config_json or {})
-        yaml_content = adapter.config_to_yaml(nested_config)
-
-        # Write temp YAML config file
-        config_fd, config_path = tempfile.mkstemp(
-            prefix=f"exp_{experiment_id}_",
-            suffix=".yaml",
-            dir=str(self._config_dir) if self._config_dir else None,
-        )
-        with os.fdopen(config_fd, "w") as f:
-            f.write(yaml_content)
-
-        # Create ExperimentRun record
+        # Create ExperimentRun record FIRST (need run.id for monitor config)
         run = ExperimentRun(
             experiment_config_id=experiment_id,
             status=RunStatus.RUNNING,
@@ -143,6 +130,26 @@ class ExperimentRunner:
 
         await session.commit()
         await session.refresh(run)
+
+        # Convert flat dot-notation config → nested dict
+        nested_config = unflatten_dict(experiment.config_json or {})
+
+        # Inject monitor config so MonitorCallback reports to hub
+        if hasattr(adapter, 'inject_monitor_config'):
+            nested_config = adapter.inject_monitor_config(
+                nested_config, run_id=run.id, server_url="http://localhost:8000"
+            )
+
+        yaml_content = adapter.config_to_yaml(nested_config)
+
+        # Write temp YAML config file
+        config_fd, config_path = tempfile.mkstemp(
+            prefix=f"exp_{experiment_id}_",
+            suffix=".yaml",
+            dir=str(self._config_dir) if self._config_dir else None,
+        )
+        with os.fdopen(config_fd, "w") as f:
+            f.write(yaml_content)
 
         # Set up log file
         log_path = self._log_dir / f"run_{run.id}.log"
@@ -158,12 +165,18 @@ class ExperimentRunner:
 
         logger.info("Starting run %d: %s", run.id, " ".join(cmd))
 
+        # Environment variables for the training subprocess
+        env = os.environ.copy()
+        env["MONITOR_RUN_ID"] = str(run.id)
+        env["MONITOR_SERVER_URL"] = "http://localhost:8000"
+
         try:
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=log_file,
                 cwd=settings.PROJECTS_DIR,
+                env=env,
             )
         except Exception as e:
             # Cleanup on launch failure

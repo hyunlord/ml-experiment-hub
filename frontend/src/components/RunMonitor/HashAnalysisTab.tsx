@@ -9,13 +9,14 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts'
-import type { MetricMessage } from './types'
+import type { MetricMessage, HashAnalysisDetailMessage, HashSample } from './types'
 
 interface HashAnalysisTabProps {
   metrics: MetricMessage[]
+  hashDetails?: HashAnalysisDetailMessage[]
 }
 
-export default function HashAnalysisTab({ metrics }: HashAnalysisTabProps) {
+export default function HashAnalysisTab({ metrics, hashDetails = [] }: HashAnalysisTabProps) {
   // Extract hash-related metrics from latest data
   const hashData = useMemo(() => {
     const bitActivation: Record<string, number> = {}
@@ -52,6 +53,12 @@ export default function HashAnalysisTab({ metrics }: HashAnalysisTabProps) {
     return { bitActivation, bitEntropy, similarityMatrix }
   }, [metrics])
 
+  const latestSamples: HashSample[] = useMemo(() => {
+    if (!hashDetails || hashDetails.length === 0) return []
+    const latest = hashDetails[hashDetails.length - 1]
+    return latest.samples || []
+  }, [hashDetails])
+
   const activationData = Object.entries(hashData.bitActivation)
     .sort(([a], [b]) => {
       const numA = parseInt(a.replace('bit_', ''), 10)
@@ -74,7 +81,7 @@ export default function HashAnalysisTab({ metrics }: HashAnalysisTabProps) {
       value: Math.round(value * 1000) / 1000,
     }))
 
-  const hasData = activationData.length > 0 || entropyData.length > 0 || hashData.similarityMatrix != null
+  const hasData = activationData.length > 0 || entropyData.length > 0 || hashData.similarityMatrix != null || latestSamples.length > 0
 
   if (!hasData) {
     return (
@@ -89,10 +96,11 @@ export default function HashAnalysisTab({ metrics }: HashAnalysisTabProps) {
         </div>
 
         {/* Placeholder cards showing expected metrics */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <PlaceholderCard title="Bit Activation Rates" description="Per-bit activation frequency across the hash code" />
           <PlaceholderCard title="Similarity Matrix" description="Pairwise similarity between sample hash codes" />
           <PlaceholderCard title="Bit Entropy" description="Information entropy per bit position" />
+          <PlaceholderCard title="Sample Hash Codes" description="Sample images with their binary hash codes" />
         </div>
       </div>
     )
@@ -188,6 +196,54 @@ export default function HashAnalysisTab({ metrics }: HashAnalysisTabProps) {
           </p>
         </div>
       )}
+
+      {/* Sample Hash Codes with Thumbnails */}
+      {latestSamples.length > 0 && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="mb-3 text-sm font-semibold text-card-foreground">
+            Sample Hash Codes
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {latestSamples.map((sample, i) => (
+              <SampleCard key={i} sample={sample} index={i} />
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Sample images with their generated hash codes. Each cell shows the binary hash value.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SampleCard({ sample, index }: { sample: HashSample; index: number }) {
+  const hashStr = sample.code.join('')
+  // Truncate display if hash is long
+  const displayCode = hashStr.length > 32
+    ? `${hashStr.slice(0, 16)}...${hashStr.slice(-16)}`
+    : hashStr
+
+  return (
+    <div className="rounded-lg border border-border bg-background p-2">
+      {sample.thumbnail && (
+        <img
+          src={sample.thumbnail.startsWith('data:') ? sample.thumbnail : `data:image/jpeg;base64,${sample.thumbnail}`}
+          alt={`Sample ${index}`}
+          className="mb-2 aspect-square w-full rounded object-cover"
+        />
+      )}
+      <div className="space-y-1">
+        <p className="text-[10px] font-medium text-muted-foreground">
+          Sample #{index}
+        </p>
+        <p className="break-all font-mono text-[9px] leading-tight text-card-foreground" title={hashStr}>
+          {displayCode}
+        </p>
+        <p className="text-[10px] text-muted-foreground">
+          {sample.code.length}-bit | {sample.code.filter(b => b === 1).length} active
+        </p>
+      </div>
     </div>
   )
 }

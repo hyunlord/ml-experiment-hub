@@ -86,6 +86,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 0.5,
                 "step": 0.01,
+                "optuna_range": {"min": 0.0, "max": 0.3},
             },
             {
                 "key": "model.freeze_backbone",
@@ -162,6 +163,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 0.1,
                 "step": 0.001,
+                "optuna_range": {"min": 0.001, "max": 0.1},
             },
             {
                 "key": "training.warmup_steps",
@@ -183,6 +185,7 @@ SCHEMA_DATA = {
                 "min": 0.1,
                 "max": 5.0,
                 "step": 0.1,
+                "optuna_range": {"min": 0.5, "max": 2.0},
             },
             {
                 "key": "training.accumulate_grad_batches",
@@ -240,6 +243,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 2.0,
                 "step": 0.1,
+                "optuna_range": {"min": 0.5, "max": 2.0},
             },
             {
                 "key": "loss.ortho_weight",
@@ -251,6 +255,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 0.3,
                 "step": 0.01,
+                "optuna_range": {"min": 0.01, "max": 0.3},
             },
             {
                 "key": "loss.quantization_weight",
@@ -262,6 +267,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 0.3,
                 "step": 0.01,
+                "optuna_range": {"min": 0.01, "max": 0.3},
             },
             {
                 "key": "loss.balance_weight",
@@ -273,6 +279,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 0.05,
                 "step": 0.001,
+                "optuna_range": {"min": 0.001, "max": 0.05},
             },
             {
                 "key": "loss.consistency_weight",
@@ -284,6 +291,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.05,
+                "optuna_range": {"min": 0.1, "max": 1.0},
             },
             {
                 "key": "loss.lcs_weight",
@@ -295,6 +303,7 @@ SCHEMA_DATA = {
                 "min": 0.0,
                 "max": 2.0,
                 "step": 0.1,
+                "optuna_range": {"min": 0.1, "max": 2.0},
             },
             {
                 "key": "loss.temperature",

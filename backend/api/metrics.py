@@ -50,6 +50,17 @@ class MetricsQueryResponse(BaseModel):
     data: list[MetricPointResponse]
 
 
+class SystemStatsIngest(BaseModel):
+    """Body for POST /api/runs/{run_id}/system."""
+    gpu_util: float | None = None
+    gpu_memory_used: float | None = None
+    gpu_memory_total: float | None = None
+    cpu_percent: float | None = None
+    ram_percent: float | None = None
+    # Multi-GPU support
+    gpus: list[dict[str, Any]] | None = None
+
+
 # ---------------------------------------------------------------------------
 # HTTP Endpoints
 # ---------------------------------------------------------------------------
@@ -97,6 +108,62 @@ async def ingest_metrics(
         },
         channel="metrics",
     )
+
+    return {"status": "ok"}
+
+
+@router.post("/api/runs/{run_id}/system", status_code=201)
+async def ingest_system_stats(
+    run_id: int,
+    body: SystemStatsIngest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, str]:
+    """Receive system stats from training process or system monitor."""
+    # Verify run exists
+    result = await session.execute(
+        select(ExperimentRun).where(ExperimentRun.id == run_id)
+    )
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+
+    # For multi-GPU, store primary GPU stats in DB
+    gpu_util = body.gpu_util
+    gpu_mem_used = body.gpu_memory_used
+    gpu_mem_total = body.gpu_memory_total
+    if body.gpus and len(body.gpus) > 0:
+        primary = body.gpus[0]
+        gpu_util = gpu_util or primary.get("util")
+        gpu_mem_used = gpu_mem_used or primary.get("memory_used_mb")
+        gpu_mem_total = gpu_mem_total or primary.get("memory_total_mb")
+
+    stat = SystemStats(
+        run_id=run_id,
+        timestamp=datetime.utcnow(),
+        gpu_util=gpu_util,
+        gpu_memory_used=gpu_mem_used,
+        gpu_memory_total=gpu_mem_total,
+        cpu_percent=body.cpu_percent,
+        ram_percent=body.ram_percent,
+    )
+    session.add(stat)
+    await session.commit()
+
+    # Broadcast via WebSocket
+    ws_data: dict[str, Any] = {
+        "type": "system_stats",
+        "run_id": run_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "gpu_util": gpu_util,
+        "gpu_memory_used": gpu_mem_used,
+        "gpu_memory_total": gpu_mem_total,
+        "cpu_percent": body.cpu_percent,
+        "ram_percent": body.ram_percent,
+    }
+    if body.gpus:
+        ws_data["gpus"] = body.gpus
+
+    await manager.broadcast(run_id, ws_data, channel="system")
 
     return {"status": "ok"}
 

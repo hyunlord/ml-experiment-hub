@@ -266,13 +266,69 @@ async def compat_hash_analysis(
 ) -> dict[str, str]:
     """Bridge: MonitorCallback hash analysis data.
 
-    Stores hash analysis (bit activations, similarity matrices)
-    as a metric entry. Large payloads are accepted but the dashboard
-    may display a subset.
+    Flattens nested hash analysis (activation rates, entropy, similarity matrix)
+    into individual hash/ prefixed metric keys for the dashboard.
+    Non-scalar data (thumbnails, sample codes) is broadcast separately.
     """
     run_id = await _resolve_run_id(body.run_id, session)
     data = body.model_dump(exclude={"run_id"}, exclude_none=True)
-    await _ingest(run_id, body.step, body.epoch, {"hash_analysis": data}, session)
+
+    # Flatten scalar data into hash/ prefixed metric keys
+    flat_metrics: dict[str, Any] = {}
+
+    # Bit activation rates: list → hash/bit_activation_0, hash/bit_activation_1, ...
+    activation_rates = data.get("activation_rates")
+    if isinstance(activation_rates, list):
+        for i, val in enumerate(activation_rates):
+            if isinstance(val, (int, float)):
+                flat_metrics[f"hash/bit_activation_{i}"] = val
+
+    # Bit entropy: list → hash/entropy_0, hash/entropy_1, ...
+    entropy = data.get("entropy")
+    if isinstance(entropy, list):
+        for i, val in enumerate(entropy):
+            if isinstance(val, (int, float)):
+                flat_metrics[f"hash/entropy_{i}"] = val
+
+    # Similarity matrix: NxN → hash/similarity_matrix_size + hash/similarity_0, ...
+    similarity_matrix = data.get("similarity_matrix")
+    if isinstance(similarity_matrix, list) and len(similarity_matrix) > 0:
+        size = len(similarity_matrix)
+        flat_metrics["hash/similarity_matrix_size"] = size
+        idx = 0
+        for row in similarity_matrix:
+            if isinstance(row, list):
+                for val in row:
+                    if isinstance(val, (int, float)):
+                        flat_metrics[f"hash/similarity_{idx}"] = val
+                        idx += 1
+
+    # Augmentation robustness scores (if present)
+    aug_robustness = data.get("augmentation_robustness")
+    if isinstance(aug_robustness, dict):
+        for key, val in aug_robustness.items():
+            if isinstance(val, (int, float)):
+                flat_metrics[f"hash/aug_{key}"] = val
+
+    # Ingest flattened scalar metrics through normal pipeline
+    if flat_metrics:
+        await _ingest(run_id, data.get("step", 0), data.get("epoch", 0), flat_metrics, session)
+
+    # Broadcast non-scalar data (thumbnails, sample codes) as separate message
+    samples = data.get("samples")
+    if samples and isinstance(samples, list):
+        await manager.broadcast(
+            run_id,
+            {
+                "type": "hash_analysis_detail",
+                "run_id": run_id,
+                "step": data.get("step", 0),
+                "epoch": data.get("epoch", 0),
+                "samples": samples,
+            },
+            channel="metrics",
+        )
+
     return {"status": "ok"}
 
 

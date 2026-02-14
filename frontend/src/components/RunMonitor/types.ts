@@ -39,3 +39,19 @@ export interface LogMessage {
   run_id: number
   line: string
 }
+
+/** Hash analysis detail (non-scalar data) from metrics channel */
+export interface HashAnalysisDetailMessage {
+  type: 'hash_analysis_detail'
+  run_id: number
+  step: number
+  epoch: number | null
+  samples: HashSample[]
+}
+
+export interface HashSample {
+  /** Base64-encoded JPEG thumbnail (128x128) */
+  thumbnail: string
+  /** Binary hash code as array of 0/1 */
+  code: number[]
+}

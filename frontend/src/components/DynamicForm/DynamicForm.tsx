@@ -6,6 +6,31 @@ import FieldRenderer from './FieldRenderer'
 import AddFieldDialog from './AddFieldDialog'
 import YamlImport from './YamlImport'
 
+/** Check if a dependency condition is met */
+function isDependencyMet(
+  dep: NonNullable<FieldDef['depends_on']>,
+  values: Record<string, unknown>,
+): boolean {
+  const fieldValue = values[dep.field]
+  if ('eq' in dep.condition) {
+    return fieldValue === dep.condition.eq
+  }
+  return false
+}
+
+/** Compute warmup recommendation based on extra_datasets count */
+function getWarmupRecommendation(
+  extraDatasets: unknown,
+  currentWarmup: unknown,
+): string | undefined {
+  if (!Array.isArray(extraDatasets) || extraDatasets.length === 0) return undefined
+  const count = extraDatasets.length
+  const recommended = 500 + count * 500
+  const current = typeof currentWarmup === 'number' ? currentWarmup : 500
+  if (current === recommended) return undefined
+  return `데이터 ${count}개 선택 → 추천 warmup: ${recommended} (현재: ${current})`
+}
+
 /**
  * DynamicForm — renders a config form from a ConfigSchema's fields array.
  *
@@ -19,6 +44,7 @@ export default function DynamicForm({
   onChange,
   onAddField,
   disabled,
+  gpuAutoConfig,
 }: DynamicFormProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false)
   const [yamlDialogOpen, setYamlDialogOpen] = useState(false)
@@ -58,6 +84,37 @@ export default function DynamicForm({
     }
   }
 
+  // Compute dependency state for a field
+  const getDependencyState = (field: FieldDef): { disabled: boolean; hint?: string } | undefined => {
+    if (!field.depends_on) return undefined
+    const met = isDependencyMet(field.depends_on, values)
+    if (!met) return undefined
+    return {
+      disabled: field.depends_on.effect === 'disabled',
+      hint: field.depends_on.hint,
+    }
+  }
+
+  // Compute extra hints for specific fields
+  const getExtraHint = (field: FieldDef): string | undefined => {
+    // Warmup recommendation based on extra_datasets
+    if (field.key === 'training.warmup_steps') {
+      return getWarmupRecommendation(values['data.extra_datasets'], values['training.warmup_steps'])
+    }
+    // GPU auto-config preview for batch_size=auto disabled fields
+    if (gpuAutoConfig && values['training.batch_size'] === 'auto') {
+      const isFrozen = values['model.freeze_backbone'] === true
+      const autoValues = isFrozen ? gpuAutoConfig.frozen : gpuAutoConfig.unfrozen
+      if (field.key === 'training.accumulate_grad_batches') {
+        return `Auto: ${autoValues.accumulate_grad_batches} (batch ${autoValues.batch_size}×${autoValues.accumulate_grad_batches} = effective ${autoValues.batch_size * autoValues.accumulate_grad_batches})`
+      }
+      if (field.key === 'data.num_workers') {
+        return `Auto: ${autoValues.num_workers} workers`
+      }
+    }
+    return undefined
+  }
+
   // ── Schema Mode ───────────────────────────────────────────────────
   if (schema) {
     return (
@@ -93,23 +150,34 @@ export default function DynamicForm({
               {/* Group body */}
               {!isCollapsed && (
                 <div className="grid grid-cols-1 gap-4 border-t border-border px-4 py-4 md:grid-cols-2">
-                  {fields.map((field) => (
-                    <div
-                      key={field.key}
-                      className={cn(
-                        // Full-width for complex fields
-                        (field.type === 'json' || field.type === 'array') &&
-                          'md:col-span-2',
-                      )}
-                    >
-                      <FieldRenderer
-                        field={field}
-                        value={values[field.key]}
-                        onChange={(v) => onChange(field.key, v)}
-                        disabled={disabled}
-                      />
-                    </div>
-                  ))}
+                  {fields.map((field) => {
+                    const depState = getDependencyState(field)
+                    const extraHint = getExtraHint(field)
+                    const finalDepState = depState
+                      ? { ...depState, hint: extraHint || depState.hint }
+                      : extraHint
+                        ? { disabled: false, hint: extraHint }
+                        : undefined
+
+                    return (
+                      <div
+                        key={field.key}
+                        className={cn(
+                          // Full-width for complex fields
+                          (field.type === 'json' || field.type === 'array') &&
+                            'md:col-span-2',
+                        )}
+                      >
+                        <FieldRenderer
+                          field={field}
+                          value={values[field.key]}
+                          onChange={(v) => onChange(field.key, v)}
+                          disabled={disabled || (finalDepState?.disabled ?? false)}
+                          dependencyState={finalDepState}
+                        />
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

@@ -42,8 +42,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 len(stale_runs),
             )
 
+    # Start system monitor service
+    from backend.core.system_monitor import system_monitor
+    system_monitor.start()
+
     yield
-    # Shutdown: cleanup if needed
+
+    # Shutdown: Stop system monitor
+    from backend.core.system_monitor import system_monitor
+    system_monitor.stop()
 
 
 # Create FastAPI application

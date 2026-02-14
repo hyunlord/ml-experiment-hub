@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.database import get_session
 from backend.schemas.experiment import (
+    DryRunResponse,
     ExperimentCreate,
     ExperimentDiffRequest,
     ExperimentDiffResponse,
@@ -114,3 +115,69 @@ async def diff_experiments(
     service = ExperimentService(session)
     diff = await service.diff_experiments(experiment_id, body.compare_with)
     return ExperimentDiffResponse(**diff)
+
+
+@router.post("/{experiment_id}/dry-run", response_model=DryRunResponse)
+async def dry_run_experiment(
+    experiment_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> DryRunResponse:
+    """Generate config YAML and command without launching training."""
+    import os
+    from pathlib import Path
+
+    from adapters.pytorch_lightning import PyTorchLightningAdapter
+    from shared.utils import unflatten_dict
+
+    service = ExperimentService(session)
+    experiment = await service.get_experiment(experiment_id)
+    if not experiment:
+        raise HTTPException(status_code=404, detail="Experiment not found")
+
+    # Get adapter and convert flat config to nested
+    adapter = PyTorchLightningAdapter()
+    flat_config = experiment.config_json
+    nested_config = unflatten_dict(flat_config)
+
+    # Generate YAML and command
+    config_yaml = adapter.config_to_yaml(nested_config)
+    command = adapter.get_train_command("/tmp/placeholder.yaml")
+
+    # Working directory
+    projects_dir = os.environ.get("PROJECTS_DIR", "./projects")
+    working_dir = str(Path(projects_dir).resolve())
+
+    # Validate and generate warnings
+    warnings = []
+    data_dir = os.environ.get("DATA_DIR", "./data")
+
+    # Check data.data_root
+    if "data" in nested_config and isinstance(nested_config["data"], dict):
+        data_root = nested_config["data"].get("data_root")
+        if data_root:
+            data_root_path = Path(data_dir) / data_root
+            if not data_root_path.exists():
+                warnings.append(f"data.data_root path not found: {data_root_path}")
+
+        # Check extra_datasets paths
+        extra_datasets = nested_config["data"].get("extra_datasets")
+        if isinstance(extra_datasets, list):
+            for ds in extra_datasets:
+                if isinstance(ds, dict):
+                    jsonl_path = ds.get("jsonl_path")
+                    if jsonl_path and not Path(jsonl_path).exists():
+                        warnings.append(f"Dataset jsonl_path not found: {jsonl_path}")
+
+    # Check batch_size auto
+    if "training" in nested_config and isinstance(nested_config["training"], dict):
+        batch_size = nested_config["training"].get("batch_size")
+        if batch_size == "auto":
+            warnings.append("training.batch_size set to 'auto' - will be resolved at runtime based on GPU memory")
+
+    return DryRunResponse(
+        config_yaml=config_yaml,
+        command=command,
+        working_dir=working_dir,
+        effective_config=nested_config,
+        warnings=warnings,
+    )
