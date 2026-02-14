@@ -44,6 +44,16 @@ class TrialStatus(str, Enum):
     FAILED = "failed"
 
 
+class QueueStatus(str, Enum):
+    """Status of a queue entry."""
+
+    WAITING = "waiting"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class JobStatus(str, Enum):
     """Status of a background job."""
 

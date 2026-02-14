@@ -5,7 +5,14 @@ from typing import Any
 
 from sqlmodel import Column, Field, JSON, Relationship, SQLModel
 
-from shared.schemas import ExperimentConfigStatus, JobStatus, JobType, RunStatus, TrialStatus
+from shared.schemas import (
+    ExperimentConfigStatus,
+    JobStatus,
+    JobType,
+    QueueStatus,
+    RunStatus,
+    TrialStatus,
+)
 
 
 class ConfigSchema(SQLModel, table=True):
@@ -230,3 +237,31 @@ class OptunaTrialResult(SQLModel, table=True):
 
     # Relationships
     study: OptunaStudy = Relationship(back_populates="trials")
+
+
+class QueueEntry(SQLModel, table=True):
+    """Experiment queue entry for sequential auto-execution.
+
+    Experiments are queued with a position (ordering). The queue scheduler
+    polls for free GPU slots and auto-starts the next waiting entry.
+    """
+
+    __tablename__ = "queue_entries"
+
+    id: int | None = Field(default=None, primary_key=True)
+    experiment_config_id: int = Field(foreign_key="experiment_configs.id", index=True)
+    position: int = Field(default=0, description="Queue position (lower = earlier)")
+    status: QueueStatus = Field(default=QueueStatus.WAITING)
+    run_id: int | None = Field(
+        default=None,
+        foreign_key="experiment_runs.id",
+        description="Created run when started",
+    )
+    error_message: str | None = Field(default=None)
+    added_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime | None = Field(default=None)
+    completed_at: datetime | None = Field(default=None)
+
+    # Relationships
+    experiment_config: ExperimentConfig = Relationship()
+    run: ExperimentRun | None = Relationship()

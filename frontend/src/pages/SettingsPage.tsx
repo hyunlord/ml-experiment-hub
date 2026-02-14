@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Database, FolderOpen, Cpu, Save } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Bell, Cpu, Database, FolderOpen, Save } from 'lucide-react'
+import { getSettings, updateSettings, type HubSettings } from '@/api/queue'
 
-interface SettingsForm {
+interface LocalSettings {
   dataRoot: string
   experimentDir: string
   apiUrl: string
@@ -9,22 +10,52 @@ interface SettingsForm {
 }
 
 export default function SettingsPage() {
-  const [form, setForm] = useState<SettingsForm>({
+  const [local, setLocal] = useState<LocalSettings>({
     dataRoot: './data',
     experimentDir: './experiments',
     apiUrl: 'http://localhost:8000',
     gpuIds: '',
   })
+  const [hub, setHub] = useState<HubSettings>({
+    discord_webhook_url: '',
+    max_concurrent_runs: 1,
+  })
   const [saved, setSaved] = useState(false)
+  const [hubLoading, setHubLoading] = useState(true)
 
-  const update = (key: keyof SettingsForm, value: string) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
+  // Load hub settings from backend
+  useEffect(() => {
+    getSettings()
+      .then((data) => setHub(data))
+      .catch(() => {})
+      .finally(() => setHubLoading(false))
+  }, [])
+
+  const updateLocal = (key: keyof LocalSettings, value: string) => {
+    setLocal((prev) => ({ ...prev, [key]: value }))
     setSaved(false)
   }
 
-  const handleSave = () => {
-    // TODO: Persist to backend /api/settings endpoint
-    localStorage.setItem('ml-hub-settings', JSON.stringify(form))
+  const updateHub_ = (key: keyof HubSettings, value: string | number) => {
+    setHub((prev) => ({ ...prev, [key]: value }))
+    setSaved(false)
+  }
+
+  const handleSave = async () => {
+    // Save local settings
+    localStorage.setItem('ml-hub-settings', JSON.stringify(local))
+
+    // Save hub settings to backend
+    try {
+      const updated = await updateSettings({
+        discord_webhook_url: hub.discord_webhook_url,
+        max_concurrent_runs: hub.max_concurrent_runs,
+      })
+      setHub(updated)
+    } catch {
+      // ignore
+    }
+
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -32,6 +63,57 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="space-y-6">
+        {/* Notifications */}
+        <Section
+          title="Notifications"
+          icon={<Bell className="h-5 w-5" />}
+        >
+          <Field
+            label="Discord Webhook URL"
+            description="Paste a Discord webhook URL to receive training notifications (start/complete/fail). Leave empty to disable."
+            value={hub.discord_webhook_url}
+            onChange={(v) => updateHub_('discord_webhook_url', v)}
+            placeholder="https://discord.com/api/webhooks/..."
+            disabled={hubLoading}
+          />
+          <p className="text-xs text-muted-foreground">
+            Browser notifications are always enabled when the tab is in the background.
+          </p>
+        </Section>
+
+        {/* Queue */}
+        <Section
+          title="Queue & Concurrency"
+          icon={<Cpu className="h-5 w-5" />}
+        >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-card-foreground">
+              Max Concurrent Runs
+            </label>
+            <p className="mb-1.5 text-xs text-muted-foreground">
+              How many experiments can run simultaneously (default 1 for single GPU).
+            </p>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={hub.max_concurrent_runs}
+              onChange={(e) =>
+                updateHub_('max_concurrent_runs', Math.max(1, parseInt(e.target.value) || 1))
+              }
+              className="w-24 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={hubLoading}
+            />
+          </div>
+          <Field
+            label="CUDA Visible Devices"
+            description="Comma-separated GPU IDs (empty = all available)"
+            value={local.gpuIds}
+            onChange={(v) => updateLocal('gpuIds', v)}
+            placeholder="0,1"
+          />
+        </Section>
+
         {/* Data paths */}
         <Section
           title="Data Paths"
@@ -40,25 +122,14 @@ export default function SettingsPage() {
           <Field
             label="Data Root"
             description="Root directory for datasets (COCO, AI Hub, etc.)"
-            value={form.dataRoot}
-            onChange={(v) => update('dataRoot', v)}
+            value={local.dataRoot}
+            onChange={(v) => updateLocal('dataRoot', v)}
           />
           <Field
             label="Experiment Directory"
             description="Where experiment configs and outputs are stored"
-            value={form.experimentDir}
-            onChange={(v) => update('experimentDir', v)}
-          />
-        </Section>
-
-        {/* GPU */}
-        <Section title="GPU Configuration" icon={<Cpu className="h-5 w-5" />}>
-          <Field
-            label="CUDA Visible Devices"
-            description="Comma-separated GPU IDs (empty = all available)"
-            value={form.gpuIds}
-            onChange={(v) => update('gpuIds', v)}
-            placeholder="0,1"
+            value={local.experimentDir}
+            onChange={(v) => updateLocal('experimentDir', v)}
           />
         </Section>
 
@@ -70,8 +141,8 @@ export default function SettingsPage() {
           <Field
             label="API URL"
             description="Backend server URL"
-            value={form.apiUrl}
-            onChange={(v) => update('apiUrl', v)}
+            value={local.apiUrl}
+            onChange={(v) => updateLocal('apiUrl', v)}
           />
         </Section>
       </div>
@@ -122,12 +193,14 @@ function Field({
   value,
   onChange,
   placeholder,
+  disabled,
 }: {
   label: string
   description: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
+  disabled?: boolean
 }) {
   return (
     <div>
@@ -140,7 +213,8 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        disabled={disabled}
+        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       />
     </div>
   )

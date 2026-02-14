@@ -200,6 +200,14 @@ class ExperimentRunner:
         monitor = asyncio.create_task(self._monitor(run.id, process, adapter, log_file, session))
         self._monitors[run.id] = monitor
 
+        # Send start notification
+        try:
+            from backend.services.notifier import notify_run_started
+
+            await notify_run_started(experiment.name, run.id)  # type: ignore[arg-type]
+        except Exception:
+            logger.warning("Failed to send start notification for run %d", run.id)
+
         return run
 
     async def stop(self, run_id: int, session: AsyncSession) -> bool:
@@ -334,6 +342,9 @@ class ExperimentRunner:
 
                 await session.commit()
 
+                # Send notifications
+                await self._send_run_notification(run, session)
+
             # Notify via WebSocket
             await ws_manager.broadcast(
                 run_id,
@@ -447,6 +458,56 @@ class ExperimentRunner:
             len(last_values),
             max_step,
         )
+
+    async def _send_run_notification(
+        self,
+        run: ExperimentRun,
+        session: AsyncSession,
+    ) -> None:
+        """Send notification for a completed/failed run."""
+        from backend.services.notifier import notify_run_completed, notify_run_failed
+
+        # Get experiment name
+        result = await session.execute(
+            select(ExperimentConfig).where(ExperimentConfig.id == run.experiment_config_id)
+        )
+        experiment = result.scalar_one_or_none()
+        exp_name = experiment.name if experiment else f"Experiment #{run.experiment_config_id}"
+
+        duration = None
+        if run.started_at and run.ended_at:
+            duration = (run.ended_at - run.started_at).total_seconds()
+
+        try:
+            if run.status == RunStatus.COMPLETED:
+                await notify_run_completed(
+                    experiment_name=exp_name,
+                    run_id=run.id,  # type: ignore[arg-type]
+                    metrics_summary=run.metrics_summary,
+                    duration_seconds=duration,
+                )
+            elif run.status == RunStatus.FAILED:
+                # Read last 10 log lines
+                last_log = None
+                if run.log_path:
+                    try:
+                        from pathlib import Path
+
+                        log_file = Path(run.log_path)
+                        if log_file.exists():
+                            lines = log_file.read_text().strip().split("\n")
+                            last_log = "\n".join(lines[-10:])
+                    except Exception:
+                        pass
+
+                await notify_run_failed(
+                    experiment_name=exp_name,
+                    run_id=run.id,  # type: ignore[arg-type]
+                    duration_seconds=duration,
+                    last_log_lines=last_log,
+                )
+        except Exception:
+            logger.warning("Failed to send notification for run %d", run.id)
 
     def _cleanup_run(self, run_id: int) -> None:
         """Remove all in-memory tracking state for a run."""
