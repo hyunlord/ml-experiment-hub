@@ -187,12 +187,12 @@ function GpuCard({ gpu }: { gpu: GpuInfo }) {
           )}
         </div>
         <div className="flex items-center gap-3">
-          {gpu.temperature != null && (
-            <div className={`flex items-center gap-1 ${tempColor(gpu.temperature)}`}>
-              <Thermometer className="h-4 w-4" />
-              <span className="text-sm font-medium">{gpu.temperature}°C</span>
-            </div>
-          )}
+          <div className={`flex items-center gap-1 ${tempColor(gpu.temperature)}`}>
+            <Thermometer className="h-4 w-4" />
+            <span className="text-sm font-medium">
+              {gpu.temperature != null ? `${gpu.temperature}°C` : 'N/A'}
+            </span>
+          </div>
           {gpu.power_draw_w != null && (
             <div className="flex items-center gap-1 text-muted-foreground">
               <Zap className="h-4 w-4" />
