@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./ml_experiments.db"
-    CORS_ORIGINS: list[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: list[str] = ["*"]
     LOG_LEVEL: str = "INFO"
     EXPERIMENT_DIR: str = "./experiments"
     PROJECTS_DIR: str = "./projects"
