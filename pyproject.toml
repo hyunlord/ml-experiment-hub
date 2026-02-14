@@ -24,12 +24,11 @@ dependencies = [
 ]
 
 [build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["backend*", "shared*", "adapters*"]
+[tool.hatch.build.targets.wheel]
+packages = ["backend", "shared", "adapters"]
 
 [tool.mypy]
 python_version = "3.11"

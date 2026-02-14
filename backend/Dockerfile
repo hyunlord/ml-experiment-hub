@@ -1,6 +1,7 @@
 # =============================================================================
 # ML Experiment Hub - Backend Dockerfile
 # Multi-stage build: dev (hot reload) / prod (gunicorn)
+# Uses uv for deterministic dependency resolution via uv.lock
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -18,11 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency spec first for layer caching
-COPY pyproject.toml ./
+# Copy dependency specs first for layer caching
+COPY pyproject.toml uv.lock ./
 
-# Install production dependencies (no dev extras)
-RUN uv pip install --system -e .
+# Create venv and install production dependencies from lockfile
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Create runtime directories
 RUN mkdir -p /data/logs /data/venvs /tmp/configs
@@ -33,7 +34,7 @@ RUN mkdir -p /data/logs /data/venvs /tmp/configs
 FROM base AS dev
 
 # Install dev dependencies too
-RUN uv pip install --system -e ".[dev]"
+RUN uv sync --frozen --no-install-project
 
 # Source code will be bind-mounted at runtime
 # Copy just enough to start (in case volumes aren't mounted)
@@ -43,17 +44,20 @@ COPY adapters/ ./adapters/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 
+# Install project itself (editable)
+RUN uv sync --frozen
+
 EXPOSE 8000
 
-CMD ["uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"]
 
 # ---------------------------------------------------------------------------
 # Stage: prod - Production with gunicorn + uvicorn workers
 # ---------------------------------------------------------------------------
 FROM base AS prod
 
-# Install gunicorn for production
-RUN uv pip install --system gunicorn
+# Install gunicorn into the venv
+RUN uv pip install gunicorn
 
 # Copy application code (no volumes in prod)
 COPY backend/ ./backend/
@@ -62,12 +66,13 @@ COPY adapters/ ./adapters/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 
+# Install project itself
+RUN uv sync --frozen --no-dev
+
 EXPOSE 8000
 
 # gunicorn with uvicorn workers for async support
-# - Workers: 2 * CPU + 1 (controlled via WEB_CONCURRENCY env)
-# - Each worker runs uvicorn's async event loop
-CMD ["gunicorn", "backend.main:app", \
+CMD ["uv", "run", "gunicorn", "backend.main:app", \
      "--bind", "0.0.0.0:8000", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--workers", "2", \
