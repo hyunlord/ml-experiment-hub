@@ -7,11 +7,14 @@ from sqlalchemy import Index
 from sqlmodel import Column, Field, JSON, Relationship, SQLModel
 
 from shared.schemas import (
+    DatasetFormat,
+    DatasetType,
     ExperimentConfigStatus,
     JobStatus,
     JobType,
     QueueStatus,
     RunStatus,
+    SplitMethod,
     TrialStatus,
 )
 
@@ -282,6 +285,14 @@ class DatasetDefinition(SQLModel, table=True):
     key: str = Field(index=True, unique=True, description="Unique slug (e.g. coco, coco_ko)")
     name: str = Field(description="Display name")
     description: str = Field(default="")
+    dataset_type: DatasetType = Field(
+        default=DatasetType.IMAGE_TEXT,
+        description="Type of data: image-text, text-only, image-only, tabular, custom",
+    )
+    dataset_format: DatasetFormat = Field(
+        default=DatasetFormat.JSONL,
+        description="Storage format: jsonl, csv, parquet, huggingface, directory",
+    )
     data_root: str = Field(default="", description="Path to image directory (relative to DATA_DIR)")
     raw_path: str = Field(
         default="",
@@ -295,8 +306,18 @@ class DatasetDefinition(SQLModel, table=True):
         default="coco_karpathy",
         description="Format of raw data: coco_karpathy, jsonl_copy, custom",
     )
+    split_method: SplitMethod = Field(
+        default=SplitMethod.NONE,
+        description="How splits are determined: ratio, file, field, custom, none",
+    )
+    splits_config: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Split configuration (ratios, file paths, field name, or custom filters)",
+    )
     entry_count: int | None = Field(default=None, description="Cached JSONL entry count")
     size_bytes: int | None = Field(default=None, description="Cached JSONL file size")
+    is_seed: bool = Field(default=False, description="Whether this is a seed dataset")
     prepare_job_id: int | None = Field(
         default=None,
         foreign_key="jobs.id",

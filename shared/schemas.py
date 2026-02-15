@@ -45,6 +45,36 @@ class DatasetStatus(str, Enum):
     PREPARING = "preparing"
 
 
+class DatasetType(str, Enum):
+    """Type of data in a dataset."""
+
+    IMAGE_TEXT = "image-text"
+    TEXT_ONLY = "text-only"
+    IMAGE_ONLY = "image-only"
+    TABULAR = "tabular"
+    CUSTOM = "custom"
+
+
+class DatasetFormat(str, Enum):
+    """Storage format of a dataset."""
+
+    JSONL = "jsonl"
+    CSV = "csv"
+    PARQUET = "parquet"
+    HUGGINGFACE = "huggingface"
+    DIRECTORY = "directory"
+
+
+class SplitMethod(str, Enum):
+    """How dataset splits are determined."""
+
+    RATIO = "ratio"
+    FILE = "file"
+    FIELD = "field"
+    CUSTOM = "custom"
+    NONE = "none"
+
+
 class TrialStatus(str, Enum):
     """Status of an Optuna trial."""
 

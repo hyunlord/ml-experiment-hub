@@ -1,13 +1,15 @@
 """Dataset registry service.
 
 Manages dataset definitions (seed + CRUD), file-system status checks,
-JSONL preview, and prepare job orchestration.
+JSONL preview, split computation, auto-detect, and prepare job orchestration.
 """
 
 from __future__ import annotations
 
+import csv
 import json
 import logging
+import math
 import random
 from pathlib import Path
 from typing import Any
@@ -17,7 +19,13 @@ from sqlmodel import select
 
 from backend.config import settings
 from backend.models.experiment import DatasetDefinition
-from shared.schemas import DatasetStatus, JobStatus
+from shared.schemas import (
+    DatasetFormat,
+    DatasetStatus,
+    DatasetType,
+    JobStatus,
+    SplitMethod,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +42,11 @@ SEED_DATASETS: list[dict[str, Any]] = [
         "raw_path": "coco/dataset_coco.json",
         "jsonl_path": "coco/coco_karpathy.jsonl",
         "raw_format": "coco_karpathy",
+        "dataset_type": DatasetType.IMAGE_TEXT,
+        "dataset_format": DatasetFormat.JSONL,
+        "split_method": SplitMethod.FIELD,
+        "splits_config": {"field": "split"},
+        "is_seed": True,
     },
     {
         "key": "coco_ko",
@@ -43,6 +56,11 @@ SEED_DATASETS: list[dict[str, Any]] = [
         "raw_path": "coco_ko/aihub_261_raw.json",
         "jsonl_path": "coco_ko/coco_ko.jsonl",
         "raw_format": "coco_karpathy",
+        "dataset_type": DatasetType.IMAGE_TEXT,
+        "dataset_format": DatasetFormat.JSONL,
+        "split_method": SplitMethod.FIELD,
+        "splits_config": {"field": "split"},
+        "is_seed": True,
     },
     {
         "key": "aihub",
@@ -52,6 +70,11 @@ SEED_DATASETS: list[dict[str, Any]] = [
         "raw_path": "aihub/aihub_71454_raw.json",
         "jsonl_path": "aihub/aihub_71454.jsonl",
         "raw_format": "coco_karpathy",
+        "dataset_type": DatasetType.IMAGE_TEXT,
+        "dataset_format": DatasetFormat.JSONL,
+        "split_method": SplitMethod.FIELD,
+        "splits_config": {"field": "split"},
+        "is_seed": True,
     },
     {
         "key": "cc3m_ko",
@@ -61,6 +84,11 @@ SEED_DATASETS: list[dict[str, Any]] = [
         "raw_path": "cc3m_ko/cc3m_ko_raw.json",
         "jsonl_path": "cc3m_ko/cc3m_ko.jsonl",
         "raw_format": "coco_karpathy",
+        "dataset_type": DatasetType.IMAGE_TEXT,
+        "dataset_format": DatasetFormat.JSONL,
+        "split_method": SplitMethod.FIELD,
+        "splits_config": {"field": "split"},
+        "is_seed": True,
     },
 ]
 
@@ -85,6 +113,268 @@ async def seed_datasets(session: AsyncSession) -> int:
         logger.info("Seeded %d dataset definitions", inserted)
 
     return inserted
+
+
+# ---------------------------------------------------------------------------
+# Auto-detect
+# ---------------------------------------------------------------------------
+
+
+def detect_dataset(path: str, data_dir: str | None = None) -> dict[str, Any]:
+    """Detect format, type, and entry count from a file or directory path.
+
+    Returns:
+        {format, type, entry_count, raw_format, error?}
+    """
+    base = Path(data_dir or settings.DATA_DIR)
+    target = base / path if not Path(path).is_absolute() else Path(path)
+
+    result: dict[str, Any] = {
+        "format": None,
+        "type": None,
+        "entry_count": None,
+        "raw_format": None,
+        "exists": False,
+    }
+
+    if not target.exists():
+        result["error"] = "Path not found"
+        return result
+
+    result["exists"] = True
+
+    if target.is_dir():
+        return _detect_directory(target, result)
+
+    suffix = target.suffix.lower()
+    if suffix == ".jsonl":
+        return _detect_jsonl(target, result)
+    elif suffix == ".json":
+        return _detect_json(target, result)
+    elif suffix == ".csv":
+        return _detect_csv(target, result)
+    elif suffix == ".parquet":
+        result["format"] = DatasetFormat.PARQUET.value
+        result["type"] = DatasetType.TABULAR.value
+        result["raw_format"] = "parquet"
+        return result
+    else:
+        result["format"] = DatasetFormat.JSONL.value
+        result["type"] = DatasetType.CUSTOM.value
+        result["raw_format"] = "custom"
+        return result
+
+
+def _detect_directory(target: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Detect a directory dataset (image folder, etc.)."""
+    result["format"] = DatasetFormat.DIRECTORY.value
+    image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"}
+    images = [f for f in target.rglob("*") if f.suffix.lower() in image_exts]
+    if images:
+        result["type"] = DatasetType.IMAGE_ONLY.value
+        result["entry_count"] = len(images)
+    else:
+        result["type"] = DatasetType.CUSTOM.value
+        result["entry_count"] = sum(1 for _ in target.rglob("*") if _.is_file())
+    result["raw_format"] = "directory"
+    return result
+
+
+def _detect_jsonl(target: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Detect a JSONL file."""
+    result["format"] = DatasetFormat.JSONL.value
+    result["raw_format"] = "jsonl_copy"
+    count = 0
+    has_image = False
+    has_caption = False
+    has_text = False
+    try:
+        with open(target) as f:
+            for i, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                count += 1
+                if i < 5:
+                    try:
+                        entry = json.loads(line)
+                        if "image" in entry:
+                            has_image = True
+                        if "caption" in entry or "caption_ko" in entry:
+                            has_caption = True
+                        if "text" in entry:
+                            has_text = True
+                    except json.JSONDecodeError:
+                        pass
+    except Exception:
+        pass
+
+    result["entry_count"] = count
+    if has_image and (has_caption or has_text):
+        result["type"] = DatasetType.IMAGE_TEXT.value
+    elif has_image:
+        result["type"] = DatasetType.IMAGE_ONLY.value
+    elif has_text or has_caption:
+        result["type"] = DatasetType.TEXT_ONLY.value
+    else:
+        result["type"] = DatasetType.CUSTOM.value
+    return result
+
+
+def _detect_json(target: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Detect a JSON file (COCO format, etc.)."""
+    result["format"] = DatasetFormat.JSONL.value  # will be converted to JSONL
+    result["raw_format"] = "coco_karpathy"
+    try:
+        with open(target) as f:
+            data = json.load(f)
+        if isinstance(data, dict) and "images" in data:
+            images = data["images"]
+            result["entry_count"] = len(images)
+            if images and "sentences" in images[0]:
+                # Karpathy format
+                total_sents = sum(len(img.get("sentences", [])) for img in images)
+                result["entry_count"] = total_sents
+            elif "annotations" in data:
+                result["entry_count"] = len(data["annotations"])
+            result["type"] = DatasetType.IMAGE_TEXT.value
+        elif isinstance(data, list):
+            result["entry_count"] = len(data)
+            result["type"] = DatasetType.CUSTOM.value
+        else:
+            result["type"] = DatasetType.CUSTOM.value
+    except Exception:
+        result["type"] = DatasetType.CUSTOM.value
+    return result
+
+
+def _detect_csv(target: Path, result: dict[str, Any]) -> dict[str, Any]:
+    """Detect a CSV file."""
+    result["format"] = DatasetFormat.CSV.value
+    result["raw_format"] = "csv"
+    count = 0
+    has_image = False
+    has_text = False
+    try:
+        with open(target, newline="") as f:
+            reader = csv.reader(f)
+            header = next(reader, None)
+            if header:
+                header_lower = [h.lower() for h in header]
+                has_image = any(h in header_lower for h in ("image", "image_path", "file"))
+                has_text = any(
+                    h in header_lower for h in ("text", "caption", "label", "description")
+                )
+                for _ in reader:
+                    count += 1
+    except Exception:
+        pass
+
+    result["entry_count"] = count
+    if has_image and has_text:
+        result["type"] = DatasetType.IMAGE_TEXT.value
+    elif has_image:
+        result["type"] = DatasetType.IMAGE_ONLY.value
+    elif has_text:
+        result["type"] = DatasetType.TEXT_ONLY.value
+    else:
+        result["type"] = DatasetType.TABULAR.value
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Split computation
+# ---------------------------------------------------------------------------
+
+
+def compute_split_preview(
+    ds: DatasetDefinition,
+    split_method: str | None = None,
+    splits_config: dict[str, Any] | None = None,
+    data_dir: str | None = None,
+) -> dict[str, int]:
+    """Compute how many entries each split would contain.
+
+    Returns: {"train": 1000, "val": 100, "test": 100}
+    """
+    method = SplitMethod(split_method) if split_method else ds.split_method
+    config = splits_config if splits_config is not None else ds.splits_config
+    base = Path(data_dir or settings.DATA_DIR)
+    jsonl = base / ds.jsonl_path if ds.jsonl_path else None
+
+    if method == SplitMethod.NONE:
+        total = _count_jsonl_lines(jsonl)
+        return {"all": total} if total else {}
+
+    if method == SplitMethod.RATIO:
+        total = _count_jsonl_lines(jsonl)
+        if not total:
+            return {}
+        ratios = config.get("ratios", {"train": 0.8, "val": 0.1, "test": 0.1})
+        result: dict[str, int] = {}
+        remaining = total
+        for i, (name, ratio) in enumerate(ratios.items()):
+            if i == len(ratios) - 1:
+                result[name] = remaining
+            else:
+                count = int(math.floor(total * float(ratio)))
+                result[name] = count
+                remaining -= count
+        return result
+
+    if method == SplitMethod.FIELD:
+        field_name = config.get("field", "split")
+        return _count_by_field(jsonl, field_name)
+
+    if method == SplitMethod.FILE:
+        files = config.get("files", {})
+        result = {}
+        for split_name, split_path in files.items():
+            split_file = base / split_path
+            result[split_name] = _count_jsonl_lines(split_file)
+        return result
+
+    if method == SplitMethod.CUSTOM:
+        filters = config.get("filters", {})
+        result = {}
+        for split_name, _filter_expr in filters.items():
+            result[split_name] = 0  # custom filters need runtime eval
+        return result
+
+    return {}
+
+
+def _count_jsonl_lines(path: Path | None) -> int:
+    """Count non-empty lines in a JSONL file."""
+    if not path or not path.exists():
+        return 0
+    try:
+        with open(path) as f:
+            return sum(1 for line in f if line.strip())
+    except Exception:
+        return 0
+
+
+def _count_by_field(path: Path | None, field: str) -> dict[str, int]:
+    """Count entries grouped by a JSON field value."""
+    if not path or not path.exists():
+        return {}
+    counts: dict[str, int] = {}
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    val = str(entry.get(field, "unknown"))
+                    counts[val] = counts.get(val, 0) + 1
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        pass
+    return counts
 
 
 # ---------------------------------------------------------------------------

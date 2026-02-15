@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Eye, Play, Save, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Database, Eye, Play, Save, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { configToYaml, yamlToConfig } from '@/lib/config'
 import { DynamicForm } from '@/components/DynamicForm'
@@ -10,6 +10,8 @@ import type { ConfigSchema, FieldDef, SchemaDefinition } from '@/types/schema'
 import type { GpuInfo } from '@/api/system'
 import * as schemasApi from '@/api/schemas'
 import { getGpuInfo } from '@/api/system'
+import { listDatasets } from '@/api/datasets'
+import type { Dataset } from '@/api/datasets'
 import client from '@/api/client'
 
 // ---------------------------------------------------------------------------
@@ -67,6 +69,10 @@ export default function ExperimentCreatePage() {
   const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null)
   const [presets, setPresets] = useState<Array<{ id: number; name: string; config_json: Record<string, unknown> }>>([])
 
+  // ── Dataset state ────────────────────────────────────────────────
+  const [datasets, setDatasets] = useState<Dataset[]>([])
+  const [selectedDatasetIds, setSelectedDatasetIds] = useState<number[]>([])
+
   // ── UI state ──────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -96,6 +102,11 @@ export default function ExperimentCreatePage() {
       setSchemas(res.schemas)
       setSchemasLoading(false)
     }).catch(() => setSchemasLoading(false))
+  }, [])
+
+  // ── Fetch datasets on mount ──────────────────────────────────────
+  useEffect(() => {
+    listDatasets().then(setDatasets).catch(() => {})
   }, [])
 
   // ── Fetch GPU info on mount ───────────────────────────────────────
@@ -217,11 +228,24 @@ export default function ExperimentCreatePage() {
     }
   }
 
+  // ── Dataset selection ─────────────────────────────────────────────
+  const toggleDataset = useCallback((id: number) => {
+    setSelectedDatasetIds((prev) =>
+      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id],
+    )
+  }, [])
+
+  const readyDatasets = useMemo(() => datasets.filter((d) => d.status === 'ready'), [datasets])
+  const unavailableDatasets = useMemo(() => datasets.filter((d) => d.status !== 'ready'), [datasets])
+
   // ── Save handlers ─────────────────────────────────────────────────
   const buildPayload = (): ExperimentCreatePayload => ({
     name: name.trim(),
     description: description.trim() || undefined,
-    config,
+    config: {
+      ...config,
+      ...(selectedDatasetIds.length > 0 ? { dataset_ids: selectedDatasetIds } : {}),
+    },
     schema_id: schemaId,
     tags,
   })
@@ -407,6 +431,88 @@ export default function ExperimentCreatePage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* ── Dataset Selector ─────────────────────────────────── */}
+        <section className="rounded-lg border border-border bg-card p-5">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold text-card-foreground">
+            <Database className="h-5 w-5" />
+            Datasets
+          </h2>
+          {datasets.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No datasets registered.{' '}
+              <a href="/datasets" className="text-primary hover:underline">
+                Register datasets
+              </a>{' '}
+              first.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {readyDatasets.map((ds) => (
+                <label
+                  key={ds.id}
+                  className={cn(
+                    'flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition-colors',
+                    selectedDatasetIds.includes(ds.id)
+                      ? 'border-primary bg-primary/5'
+                      : 'border-input hover:bg-accent/50',
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedDatasetIds.includes(ds.id)}
+                    onChange={() => toggleDataset(ds.id)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-medium text-card-foreground">{ds.name}</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {ds.dataset_type} / {ds.dataset_format}
+                      {ds.entry_count != null && ` / ${ds.entry_count.toLocaleString()} entries`}
+                    </span>
+                    {ds.split_method !== 'none' && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        (split: {ds.split_method})
+                      </span>
+                    )}
+                  </div>
+                  {ds.is_seed && (
+                    <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                      SEED
+                    </span>
+                  )}
+                </label>
+              ))}
+              {unavailableDatasets.length > 0 && (
+                <div className="mt-3 border-t border-border pt-3">
+                  <p className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
+                    <AlertTriangle className="h-3 w-3" />
+                    Unavailable datasets (prepare or fix path first):
+                  </p>
+                  {unavailableDatasets.map((ds) => (
+                    <div
+                      key={ds.id}
+                      className="flex items-center gap-3 rounded-md border border-dashed border-input px-3 py-2 opacity-50"
+                    >
+                      <input type="checkbox" disabled className="h-4 w-4 rounded border-input" />
+                      <span className="text-sm text-muted-foreground">{ds.name}</span>
+                      <span className={cn(
+                        'ml-auto rounded px-1.5 py-0.5 text-[10px] font-medium',
+                        ds.status === 'not_found'
+                          ? 'bg-destructive/10 text-destructive'
+                          : ds.status === 'preparing'
+                            ? 'bg-yellow-500/10 text-yellow-600'
+                            : 'bg-orange-500/10 text-orange-600',
+                      )}>
+                        {ds.status === 'not_found' ? 'Not Found' : ds.status === 'preparing' ? 'Preparing' : 'Raw Only'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* ── Config Form (DynamicForm) ────────────────────────── */}
