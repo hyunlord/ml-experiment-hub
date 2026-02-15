@@ -56,9 +56,6 @@ CMD ["uv", "run", "uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0"
 # ---------------------------------------------------------------------------
 FROM base AS prod
 
-# Install gunicorn into the venv
-RUN uv pip install gunicorn
-
 # Copy application code (no volumes in prod)
 COPY backend/ ./backend/
 COPY shared/ ./shared/
@@ -66,8 +63,8 @@ COPY adapters/ ./adapters/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
 
-# Install project itself
-RUN uv sync --frozen --no-dev
+# Install project itself, then add gunicorn (must be after sync)
+RUN uv sync --frozen --no-dev && uv pip install gunicorn
 
 EXPOSE 8002
 
