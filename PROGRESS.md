@@ -1,3 +1,71 @@
+# Milestone 5 Progress
+
+## Status: COMPLETE
+
+## Completion Criteria
+
+### Notifications
+- [x] Browser Notification on training complete/fail (even in background tabs)
+- [x] Settings page with Discord webhook URL input field
+- [x] Settings page with Slack webhook URL input field
+- [x] Webhook sends on training start/complete/fail (experiment name, status, duration, metrics)
+- [x] Failed run notification includes last log lines
+- [x] Test Webhook button for both Discord and Slack
+- [x] No error if webhook is not configured (browser notification only)
+
+### Experiment Queue
+- [x] Add experiments to queue from experiment list ("Add to Queue" button)
+- [x] /queue page with drag-and-drop reordering (dnd-kit)
+- [x] Status icons (waiting/running/completed/failed/cancelled)
+- [x] Auto-start next queued experiment when GPU is free (5s polling scheduler)
+- [x] Remove from queue, reorder support
+- [x] Configurable concurrency limit (default 1, max 8 in Settings)
+- [x] Queue history view
+
+### Platform Genericity
+- [x] No vlm-specific terms in notification/queue code
+- [x] gate.sh PASS (212 tests, 1 skipped, smoke OK)
+
+## Changes Summary
+
+### Backend — Notification Service
+- **services/notifier.py**: Added Slack webhook support (`send_slack_webhook`),
+  `test_webhook(provider)` function, Slack calls in `notify_run_started`,
+  `notify_run_completed`, `notify_run_failed`; hub settings persistence with
+  `slack_webhook_url` field
+- **api/settings.py**: Added `slack_webhook_url` to `HubSettingsResponse` and
+  `UpdateSettingsRequest`; added `POST /api/settings/test-webhook` endpoint with
+  `TestWebhookRequest`/`TestWebhookResponse` schemas
+
+### Backend — Queue System (pre-existing from M4)
+- **models/experiment.py**: QueueEntry model (already complete)
+- **services/queue_scheduler.py**: 5s polling scheduler with start/stop (already complete)
+- **api/queue.py**: Full CRUD — list, add, delete, reorder, history (already complete)
+
+### Frontend — Settings Page
+- **SettingsPage.tsx**: Added Slack webhook URL field, Test Webhook buttons
+  for both Discord and Slack with send/result feedback
+- **api/queue.ts**: Added `slack_webhook_url` to `HubSettings` type,
+  `testWebhook(provider)` API function
+
+### Frontend — Experiment List
+- **ExperimentListPage.tsx**: Added "Add to Queue" button (ListPlus icon)
+  for draft/failed/cancelled/completed experiments
+
+### Frontend — Queue & Notifications (pre-existing)
+- **QueuePage.tsx**: Full queue management with dnd-kit, status icons, add modal, history
+- **hooks/useNotifications.ts**: WebSocket connection + browser Notification API
+- **components/Layout.tsx**: `useNotifications()` at app level
+
+### Tests
+- **test_milestone5.py**: 36 tests covering hub settings persistence, Discord/Slack
+  webhook construction, notification events (start/complete/fail), test webhook,
+  queue model/schemas, scheduler structure, WS endpoint, process manager integration,
+  genericity checks, API route existence, lifespan integration
+- 212 tests pass total, 1 skipped, gate.sh PASS
+
+---
+
 # Milestone 4 Progress
 
 ## Status: COMPLETE

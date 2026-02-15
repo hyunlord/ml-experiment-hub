@@ -44,6 +44,7 @@ def get_hub_settings() -> dict[str, Any]:
     """Get all hub settings."""
     defaults: dict[str, Any] = {
         "discord_webhook_url": "",
+        "slack_webhook_url": "",
         "max_concurrent_runs": 1,
     }
     saved = _load_settings()
@@ -114,6 +115,75 @@ async def send_discord_webhook(
         logger.warning("Failed to send Discord webhook: %s", title)
 
 
+async def send_slack_webhook(
+    text: str,
+    blocks: list[dict[str, Any]] | None = None,
+) -> None:
+    """Send a message to Slack via incoming webhook.
+
+    Args:
+        text: Fallback text for notifications.
+        blocks: Optional Slack Block Kit blocks for rich formatting.
+    """
+    hub_settings = get_hub_settings()
+    webhook_url = hub_settings.get("slack_webhook_url", "")
+    if not webhook_url:
+        return  # No webhook configured — silently skip
+
+    payload: dict[str, Any] = {"text": text}
+    if blocks:
+        payload["blocks"] = blocks
+
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(webhook_url, json=payload, timeout=10.0)
+            resp.raise_for_status()
+            logger.info("Slack webhook sent: %s", text[:80])
+    except Exception:
+        logger.warning("Failed to send Slack webhook: %s", text[:80])
+
+
+async def test_webhook(provider: str = "discord") -> dict[str, Any]:
+    """Send a test message to the configured webhook.
+
+    Args:
+        provider: 'discord' or 'slack'.
+
+    Returns:
+        dict with 'ok' bool and optional 'error' message.
+    """
+    hub_settings = get_hub_settings()
+
+    if provider == "discord":
+        url = hub_settings.get("discord_webhook_url", "")
+        if not url:
+            return {"ok": False, "error": "Discord webhook URL not configured"}
+        try:
+            await send_discord_webhook(
+                title="Test Notification",
+                description="This is a test message from ML Experiment Hub.",
+                color=0x9B59B6,  # purple
+                fields=[{"name": "Status", "value": "Webhook is working!", "inline": "true"}],
+            )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    elif provider == "slack":
+        url = hub_settings.get("slack_webhook_url", "")
+        if not url:
+            return {"ok": False, "error": "Slack webhook URL not configured"}
+        try:
+            await send_slack_webhook(
+                text="Test Notification from ML Experiment Hub - Webhook is working!",
+            )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    return {"ok": False, "error": f"Unknown provider: {provider}"}
+
+
 async def notify_run_started(
     experiment_name: str,
     run_id: int,
@@ -134,6 +204,11 @@ async def notify_run_started(
         title="Training Started",
         description=f"**{experiment_name}** (Run #{run_id})",
         color=0x3498DB,  # blue
+    )
+
+    # Slack webhook
+    await send_slack_webhook(
+        text=f":arrow_forward: *Training Started*: {experiment_name} (Run #{run_id})",
     )
 
 
@@ -192,6 +267,14 @@ async def notify_run_completed(
         fields=fields,
     )
 
+    # Slack webhook
+    slack_parts = [f":white_check_mark: *Training Completed*: {experiment_name} (Run #{run_id})"]
+    if duration_str:
+        slack_parts.append(f"Duration: {duration_str}")
+    if metrics_display:
+        slack_parts.append(f"```{metrics_display}```")
+    await send_slack_webhook(text="\n".join(slack_parts))
+
 
 async def notify_run_failed(
     experiment_name: str,
@@ -235,3 +318,12 @@ async def notify_run_failed(
         color=0xE74C3C,  # red
         fields=fields,
     )
+
+    # Slack webhook
+    slack_parts = [f":x: *Training Failed*: {experiment_name} (Run #{run_id})"]
+    if duration_str:
+        slack_parts.append(f"Duration: {duration_str}")
+    if last_log_lines:
+        truncated = last_log_lines[:500]
+        slack_parts.append(f"```{truncated}```")
+    await send_slack_webhook(text="\n".join(slack_parts))

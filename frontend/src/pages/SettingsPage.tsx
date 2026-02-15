@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, Cpu, Database, FolderOpen, Save } from 'lucide-react'
-import { getSettings, updateSettings, type HubSettings } from '@/api/queue'
+import { Bell, Cpu, Database, FolderOpen, Save, Send } from 'lucide-react'
+import { getSettings, updateSettings, testWebhook, type HubSettings } from '@/api/queue'
 
 interface LocalSettings {
   dataRoot: string
@@ -18,10 +18,14 @@ export default function SettingsPage() {
   })
   const [hub, setHub] = useState<HubSettings>({
     discord_webhook_url: '',
+    slack_webhook_url: '',
     max_concurrent_runs: 1,
   })
   const [saved, setSaved] = useState(false)
   const [hubLoading, setHubLoading] = useState(true)
+  const [testingDiscord, setTestingDiscord] = useState(false)
+  const [testingSlack, setTestingSlack] = useState(false)
+  const [testResult, setTestResult] = useState<string | null>(null)
 
   // Load hub settings from backend
   useEffect(() => {
@@ -49,6 +53,7 @@ export default function SettingsPage() {
     try {
       const updated = await updateSettings({
         discord_webhook_url: hub.discord_webhook_url,
+        slack_webhook_url: hub.slack_webhook_url,
         max_concurrent_runs: hub.max_concurrent_runs,
       })
       setHub(updated)
@@ -58,6 +63,30 @@ export default function SettingsPage() {
 
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleTestWebhook = async (provider: 'discord' | 'slack') => {
+    const setter = provider === 'discord' ? setTestingDiscord : setTestingSlack
+    setter(true)
+    setTestResult(null)
+    try {
+      // Save current URL first
+      await updateSettings({
+        discord_webhook_url: hub.discord_webhook_url,
+        slack_webhook_url: hub.slack_webhook_url,
+      })
+      const result = await testWebhook(provider)
+      if (result.ok) {
+        setTestResult(`${provider} webhook sent successfully!`)
+      } else {
+        setTestResult(`${provider} webhook failed: ${result.error}`)
+      }
+    } catch {
+      setTestResult(`Failed to test ${provider} webhook`)
+    } finally {
+      setter(false)
+      setTimeout(() => setTestResult(null), 4000)
+    }
   }
 
   return (
@@ -76,6 +105,39 @@ export default function SettingsPage() {
             placeholder="https://discord.com/api/webhooks/..."
             disabled={hubLoading}
           />
+          {hub.discord_webhook_url && (
+            <button
+              onClick={() => handleTestWebhook('discord')}
+              disabled={testingDiscord}
+              className="flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {testingDiscord ? 'Sending...' : 'Test Discord Webhook'}
+            </button>
+          )}
+          <Field
+            label="Slack Webhook URL"
+            description="Paste a Slack incoming webhook URL. Leave empty to disable."
+            value={hub.slack_webhook_url}
+            onChange={(v) => updateHub_('slack_webhook_url', v)}
+            placeholder="https://hooks.slack.com/services/..."
+            disabled={hubLoading}
+          />
+          {hub.slack_webhook_url && (
+            <button
+              onClick={() => handleTestWebhook('slack')}
+              disabled={testingSlack}
+              className="flex items-center gap-1.5 rounded-md border border-input px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" />
+              {testingSlack ? 'Sending...' : 'Test Slack Webhook'}
+            </button>
+          )}
+          {testResult && (
+            <p className={`text-xs ${testResult.includes('success') ? 'text-green-500' : 'text-destructive'}`}>
+              {testResult}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             Browser notifications are always enabled when the tab is in the background.
           </p>

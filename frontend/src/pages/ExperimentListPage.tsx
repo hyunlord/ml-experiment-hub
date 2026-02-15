@@ -8,6 +8,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  ListPlus,
   Play,
   Plus,
   Search,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import client from '@/api/client'
+import { addToQueue } from '@/api/queue'
 
 // ---------------------------------------------------------------------------
 // Types (aligned with new backend ExperimentResponse)
@@ -232,6 +234,16 @@ export default function ExperimentListPage() {
         next.delete(id)
         return next
       })
+      fetchExperiments()
+    } catch {
+      // Could show toast
+    }
+  }
+
+  const handleAddToQueue = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation()
+    try {
+      await addToQueue(id)
       fetchExperiments()
     } catch {
       // Could show toast
@@ -556,6 +568,16 @@ export default function ExperimentListPage() {
                           >
                             <Copy className="h-4 w-4" />
                           </ActionBtn>
+                          {/* Add to Queue (draft/failed/cancelled/completed) */}
+                          {(canStart || exp.status === 'completed') && (
+                            <ActionBtn
+                              title="Add to Queue"
+                              onClick={(e) => handleAddToQueue(e, exp.id)}
+                              className="text-primary hover:bg-primary/10"
+                            >
+                              <ListPlus className="h-4 w-4" />
+                            </ActionBtn>
+                          )}
                           {/* Start (draft/failed/cancelled) */}
                           {canStart && (
                             <ActionBtn
