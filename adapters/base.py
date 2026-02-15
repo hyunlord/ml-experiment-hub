@@ -62,3 +62,56 @@ class BaseAdapter(ABC):
             direction is "minimize" or "maximize".
         """
         return {}
+
+    # ------------------------------------------------------------------
+    # Optional: search / index / eval capabilities
+    # Override in adapter subclasses that support these features.
+    # ------------------------------------------------------------------
+
+    def load_model(self, checkpoint_path: str) -> Any:
+        """Load a model checkpoint for inference.
+
+        Returns:
+            Model object ready for encoding.
+        """
+        raise NotImplementedError(f"{self.get_name()} does not support model loading")
+
+    def load_index(self, index_path: str) -> dict[str, Any]:
+        """Load a pre-built search index from disk.
+
+        Returns:
+            Index data dict.
+        """
+        raise NotImplementedError(f"{self.get_name()} does not support index loading")
+
+    def search_by_text(
+        self,
+        model: Any,
+        query: str,
+        index_data: dict[str, Any],
+        bit_length: int = 64,
+        top_k: int = 20,
+        method: str = "hamming",
+    ) -> dict[str, Any]:
+        """Text-to-image search.
+
+        Returns:
+            Dict with 'results', 'query_hash', 'search_time_ms', etc.
+        """
+        raise NotImplementedError(f"{self.get_name()} does not support text search")
+
+    def search_by_image(
+        self,
+        model: Any,
+        image_bytes: bytes,
+        index_data: dict[str, Any],
+        bit_length: int = 64,
+        top_k: int = 20,
+        method: str = "hamming",
+    ) -> dict[str, Any]:
+        """Image-to-text search.
+
+        Returns:
+            Dict with 'results', 'query_hash', 'search_time_ms', etc.
+        """
+        raise NotImplementedError(f"{self.get_name()} does not support image search")
