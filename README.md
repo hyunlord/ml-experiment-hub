@@ -119,16 +119,42 @@ docker compose up -d --build
 6. **Compare** — select experiments and click Compare for side-by-side analysis
 7. **Try the demo** — go to Classifier Demo, upload an image, and classify it
 
-## DGX Spark Setup
+## Deployment (DGX Spark)
 
-For NVIDIA DGX Spark (GB10 Grace-Blackwell, 128 GB unified memory):
+For NVIDIA DGX Spark (GB10 Grace-Blackwell, 128 GB unified memory).
+
+### First-time Setup
 
 ```bash
-# One-time setup
+git clone <repo-url> && cd ml-experiment-hub
+cp .env.example .env   # edit paths: PROJECTS_DIR, DATA_DIR, CHECKPOINT_DIR
 ./scripts/setup_dgx.sh --data-dir ~/data --checkpoint-dir ~/checkpoints
-
-# Start
 docker compose up -d
+```
+
+### Code Update (after local changes are pushed)
+
+```bash
+./scripts/deploy.sh
+# or: make deploy
+```
+
+### Database Reset (migration issues or fresh start)
+
+```bash
+./scripts/reset-db.sh
+# or: make reset-db
+```
+
+### Monitoring
+
+```bash
+# Live backend logs
+docker compose logs backend --tail 50 -f
+# or: make logs
+
+# Service status + health
+make status
 ```
 
 See `configs/dgx_spark.yaml` for the pre-tuned training preset.

@@ -14,7 +14,7 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - ./data:/data                              # DB + logs (persistent)
+      - ./data:/data                              # DB (./data/ml_hub.db) + logs (persistent)
       - ${PROJECTS_DIR:-./_projects}:/projects:ro  # ML project code (read-only)
       - ${DATA_DIR:-./_data}:/ml-data:ro           # Training data (COCO etc, read-only)
       - ${CHECKPOINT_DIR:-./_checkpoints}:/checkpoints  # Checkpoints (read/write)
