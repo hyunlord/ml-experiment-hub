@@ -10,6 +10,7 @@ import type {
   CloneRequest,
   CloneStatusResponse,
   UploadResponse,
+  ParsedConfigResponse,
 } from '@/types/project'
 
 // --- Project CRUD ---
@@ -113,5 +114,17 @@ export const getConfigContent = async (
   const response = await client.get(
     `/projects/${projectId}/configs/${configPath}`
   )
+  return response.data
+}
+
+// --- Config Parsing ---
+
+export const parseConfig = async (
+  projectId: number | string,
+  configPath: string
+): Promise<ParsedConfigResponse> => {
+  const response = await client.post(`/projects/${projectId}/parse-config`, {
+    config_path: configPath,
+  })
   return response.data
 }

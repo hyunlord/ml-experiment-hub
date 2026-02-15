@@ -16,6 +16,8 @@ class ExperimentCreate(BaseModel):
     description: str = Field(default="")
     config: dict[str, Any] = Field(default_factory=dict)
     schema_id: int | None = Field(default=None)
+    project_id: int | None = Field(default=None)
+    base_config_path: str | None = Field(default=None)
     tags: list[str] = Field(default_factory=list)
 
 
