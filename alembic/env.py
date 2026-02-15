@@ -16,6 +16,7 @@ from backend.models import (  # noqa: F401
     ExperimentConfig,
     ExperimentRun,
     MetricLog,
+    Project,
     SystemStats,
 )
 

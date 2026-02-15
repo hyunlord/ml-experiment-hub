@@ -36,6 +36,7 @@ class ExperimentResponse(BaseModel):
     status: ExperimentConfigStatus
     config: dict[str, Any]
     schema_id: int | None
+    project_id: int | None
     tags: list[str]
     created_at: datetime
     updated_at: datetime
@@ -55,6 +56,7 @@ class ExperimentResponse(BaseModel):
             status=model.status,
             config=model.config_json,
             schema_id=model.config_schema_id,
+            project_id=model.project_id,
             tags=model.tags,
             created_at=model.created_at,
             updated_at=model.updated_at,

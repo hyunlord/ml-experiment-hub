@@ -1,6 +1,9 @@
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import DashboardPage from './pages/DashboardPage'
+import ProjectListPage from './pages/ProjectListPage'
+import ProjectCreatePage from './pages/ProjectCreatePage'
+import ProjectDetailPage from './pages/ProjectDetailPage'
 import ExperimentListPage from './pages/ExperimentListPage'
 import ExperimentCreatePage from './pages/ExperimentCreatePage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
@@ -22,6 +25,9 @@ function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<DashboardPage />} />
+        <Route path="/projects" element={<ProjectListPage />} />
+        <Route path="/projects/new" element={<ProjectCreatePage />} />
+        <Route path="/projects/:id" element={<ProjectDetailPage />} />
         <Route path="/experiments" element={<ExperimentListPage />} />
         <Route path="/experiments/new" element={<ExperimentCreatePage />} />
         <Route path="/experiments/:id/edit" element={<ExperimentCreatePage />} />
