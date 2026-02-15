@@ -18,7 +18,7 @@ import {
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { configToYaml, yamlToConfig, flattenConfig, unflattenConfig } from '@/lib/config'
+import { configToYaml, yamlToConfig } from '@/lib/config'
 import { getProjects, parseConfig } from '@/api/projects'
 import client from '@/api/client'
 import type { Project, ConfigFileInfo, ParsedConfigResponse } from '@/types/project'
@@ -1051,7 +1051,7 @@ function ViewTab({
 
 function ConfigField({
   label,
-  fullKey,
+  fullKey: _fullKey,
   value,
   type,
   isChanged,
