@@ -11,6 +11,7 @@ import {
   X,
   Loader2,
   AlertCircle,
+  RefreshCw,
   Upload,
   FileText,
   Github,
@@ -164,13 +165,27 @@ export default function ProjectCreatePage() {
     };
   }, [formData.path, sourceType]);
 
-  // Poll clone status
+  // Poll clone status (with retry limit and timeout)
   useEffect(() => {
     if (!cloneJobId || !cloning) return;
 
+    let errorCount = 0;
+    const maxErrors = 3;
+    const maxPollDuration = 5 * 60 * 1000; // 5 minutes
+    const startTime = Date.now();
+
     const interval = setInterval(async () => {
+      // Timeout guard
+      if (Date.now() - startTime > maxPollDuration) {
+        clearInterval(interval);
+        setCloning(false);
+        setScanError('Clone timed out after 5 minutes. Please try again.');
+        return;
+      }
+
       try {
         const status = await getCloneStatus(cloneJobId);
+        errorCount = 0; // Reset on success
         setCloneStatus(status);
 
         if (status.status === 'completed') {
@@ -193,7 +208,13 @@ export default function ProjectCreatePage() {
           setScanError(status.error || 'Clone failed');
         }
       } catch (error) {
-        console.error('Failed to poll clone status:', error);
+        errorCount++;
+        console.error(`Clone poll error (${errorCount}/${maxErrors}):`, error);
+        if (errorCount >= maxErrors) {
+          clearInterval(interval);
+          setCloning(false);
+          setScanError('Clone job not found. The server may have restarted. Please try again.');
+        }
       }
     }, 2000);
 
@@ -261,6 +282,12 @@ export default function ProjectCreatePage() {
       setCloning(false);
       setScanError(error instanceof Error ? error.message : 'Failed to start clone');
     }
+  };
+
+  const handleClearCloneError = () => {
+    setCloneStatus(null);
+    setScanError(null);
+    setCloneJobId(null);
   };
 
   const handleUploadFiles = async () => {
@@ -482,6 +509,7 @@ export default function ProjectCreatePage() {
             onInputChange={handleInputChange}
             onPrivateRepoChange={setPrivateRepo}
             onClone={handleCloneRepo}
+            onClearError={handleClearCloneError}
           />
         )}
         {sourceType === 'github' && step === 2 && scanResults && (
@@ -700,6 +728,7 @@ function GitHubStep1({
   onInputChange,
   onPrivateRepoChange,
   onClone,
+  onClearError,
 }: {
   formData: FormData;
   privateRepo: boolean;
@@ -710,6 +739,7 @@ function GitHubStep1({
   onInputChange: (field: keyof FormData, value: string | number | null) => void;
   onPrivateRepoChange: (value: boolean) => void;
   onClone: () => void;
+  onClearError: () => void;
 }) {
   return (
     <div className="space-y-6">
@@ -720,7 +750,12 @@ function GitHubStep1({
         <input
           type="text"
           value={formData.git_url}
-          onChange={(e) => onInputChange('git_url', e.target.value)}
+          onChange={(e) => {
+            onInputChange('git_url', e.target.value);
+            if (scanError || cloneStatus?.status === 'failed') {
+              onClearError();
+            }
+          }}
           placeholder="https://github.com/username/repo.git"
           disabled={cloning}
           className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
@@ -774,14 +809,14 @@ function GitHubStep1({
         </div>
       )}
 
-      {!cloning && !cloneStatus && (
+      {!cloning && (!cloneStatus || cloneStatus.status === 'failed') && (
         <button
           onClick={onClone}
           disabled={!formData.git_url.trim() || (privateRepo && !formData.git_token_id)}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <GitBranch className="w-4 h-4" />
-          Clone & Scan
+          {cloneStatus?.status === 'failed' ? 'Retry Clone & Scan' : 'Clone & Scan'}
         </button>
       )}
 
@@ -832,9 +867,30 @@ function GitHubStep1({
       )}
 
       {scanError && (
-        <div className="p-3 bg-destructive/10 border border-destructive rounded-lg flex items-start gap-2">
-          <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive">{scanError}</p>
+        <div className="p-4 bg-destructive/10 border border-destructive rounded-lg">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+            <p className="text-sm font-medium text-destructive flex-1">{scanError}</p>
+          </div>
+          <div className="flex items-center justify-end gap-2 mt-3">
+            <button
+              onClick={onClearError}
+              className="px-3 py-1.5 text-sm rounded-md border border-border bg-background hover:bg-accent transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => {
+                onClearError();
+                onClone();
+              }}
+              disabled={!formData.git_url.trim() || (privateRepo && !formData.git_token_id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          </div>
         </div>
       )}
     </div>
