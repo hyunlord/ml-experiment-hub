@@ -10,7 +10,7 @@ set -euo pipefail
 
 TICKET_FILE="$1"
 BRANCH="${2:-}"
-ENV_ID="${CODEX_ENV_ID:?ERROR: CODEX_ENV_ID 환경변수를 설정하세요}"
+ENV_ID="${CODEX_ENV_MLHUB:?ERROR: CODEX_ENV_MLHUB 환경변수를 설정하세요}"
 
 if [ ! -f "$TICKET_FILE" ]; then
   echo "[codex-dispatch] ERROR: 파일 없음: $TICKET_FILE"
