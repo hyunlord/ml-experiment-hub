@@ -1,6 +1,8 @@
+import { useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Beaker,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Cpu,
@@ -11,6 +13,7 @@ import {
   Moon,
   Play,
   Search,
+  Server,
   Settings,
   Shapes,
   SlidersHorizontal,
@@ -19,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSidebarStore } from '@/stores/sidebarStore'
+import { useServerStore } from '@/stores/serverStore'
 import { useNotifications } from '@/hooks/useNotifications'
 
 interface LayoutProps {
@@ -184,7 +188,15 @@ function Sidebar() {
 
 function TopBar() {
   const { theme, toggle } = useThemeStore()
+  const { servers, activeServerId, setActive, fetchServers } = useServerStore()
   const location = useLocation()
+
+  // Fetch servers on mount
+  useEffect(() => {
+    fetchServers()
+  }, [fetchServers])
+
+  const activeServer = servers.find((s) => s.id === activeServerId)
 
   // Derive page title from route
   const title = (() => {
@@ -216,10 +228,31 @@ function TopBar() {
       <h1 className="text-lg font-semibold text-foreground">{title}</h1>
 
       <div className="flex items-center gap-4">
+        {/* Server selector */}
+        {servers.length > 0 && (
+          <div className="relative">
+            <div className="flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1.5 text-sm">
+              <Server className="h-3.5 w-3.5 text-muted-foreground" />
+              <select
+                value={activeServerId ?? ''}
+                onChange={(e) => setActive(e.target.value ? Number(e.target.value) : null)}
+                className="appearance-none bg-transparent pr-5 text-sm text-foreground focus:outline-none"
+              >
+                {servers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.is_local ? ' (local)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </div>
+        )}
+
         {/* GPU status indicator */}
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           <Cpu className="h-4 w-4" />
-          <span>GPU idle</span>
+          <span>{activeServer?.name ?? 'GPU idle'}</span>
         </div>
 
         {/* Theme toggle */}

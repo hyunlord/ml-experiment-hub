@@ -86,13 +86,14 @@ For multi-step tasks, state a brief plan:
 
 Lead engineer: architecture, integration, refactors, data model boundaries.
 
+**Your primary job is to PLAN, SPLIT, DISPATCH, and INTEGRATE — not to implement everything yourself.**
+
 ## Worktree Rules
 
 | Worktree | Purpose | Agent |
 |----------|---------|-------|
 | `ml-experiment-hub-wt/lead` | Architecture, integration, refactors | Claude Code |
 | `ml-experiment-hub-wt/t-<id>-<slug>` | Isolated implementation tickets | Codex Pro (via CLI) |
-| `ml-experiment-hub-wt/gate` | Build verification | gate.sh |
 
 ## Guardrails
 
@@ -104,12 +105,43 @@ Lead engineer: architecture, integration, refactors, data model boundaries.
 
 ---
 
-## Codex Pro Auto-Dispatch
+## Codex Pro Auto-Dispatch [MANDATORY]
 
 Claude Code delegates implementation tickets to Codex Pro via Codex CLI.
-**This is the primary method for getting tickets implemented. Use it for all isolated implementation work.**
 
-### Dispatch a ticket
+### ⚠️ CRITICAL RULE: Default is DISPATCH, not implement directly.
+
+When you create tickets, the DEFAULT action is to dispatch them to Codex.
+You may only implement directly if ALL of the following are true:
+1. The change modifies shared interfaces (base plugin classes, config schema, DB models, Alembic migrations)
+2. The change is pure integration wiring (<50 lines, connecting already-implemented pieces)
+3. The change cannot be split into any smaller independent unit
+
+If even ONE file in the ticket is a standalone change, split it out and dispatch that part.
+
+**You MUST justify in writing why you are NOT dispatching a ticket.**
+Write this justification in PROGRESS.md before implementing directly:
+```
+[DIRECT] t-XXX: <reason why this cannot be dispatched>
+```
+If you cannot articulate a clear reason, dispatch it.
+
+### How to split "cross-service" work for dispatch
+
+Most "cross-service" features CAN be split. "This touches multiple services" is NOT a valid reason to skip dispatch.
+
+Example: "Add model registry with API endpoint"
+- ❌ WRONG: "This is cross-service, I'll do it all myself"
+- ✅ RIGHT: Split into:
+  - t-101: Add ModelRegistry data class + repository (standalone module) → 🟢 DISPATCH
+  - t-102: Add /models API endpoints (standalone router file) → 🟢 DISPATCH
+  - t-103: Add model registry tests → 🟢 DISPATCH
+  - t-104: Alembic migration for models table → 🔴 DIRECT (migration is lead-only)
+  - t-105: Wire registry into app startup + config → 🔴 DIRECT (integration wiring)
+
+The ONLY parts you implement directly are migrations and final wiring (usually <50 lines each).
+
+### Dispatch command
 
 ```bash
 bash tools/codex_dispatch.sh tickets/<ticket-file>.md [branch-name]
@@ -125,8 +157,9 @@ bash tools/codex_dispatch.sh tickets/t-010-smoke-train.md
 bash tools/codex_dispatch.sh tickets/t-020-model-registry.md t/020-model-registry
 
 # Parallel dispatch (only when file scopes don't overlap, max 3)
-bash tools/codex_dispatch.sh tickets/t-010-smoke-train.md &
-bash tools/codex_dispatch.sh tickets/t-011-add-metrics-api.md &
+bash tools/codex_dispatch.sh tickets/t-101-registry-data.md &
+bash tools/codex_dispatch.sh tickets/t-102-registry-api.md &
+bash tools/codex_dispatch.sh tickets/t-103-registry-tests.md &
 wait
 ```
 
@@ -142,14 +175,29 @@ bash tools/codex_status.sh
 bash tools/codex_apply.sh
 ```
 
-### Dispatch rules
+### Dispatch decision tree
 
-- **Always dispatch** isolated implementation tickets (single module, single endpoint, single test suite)
-- **Never dispatch** architecture changes, cross-service refactors, shared interface modifications, or DB schema migrations — do those in lead worktree directly
-- **Never dispatch** tickets that touch plugin base classes, protocol definitions, or Alembic migrations
-- Max 3 parallel dispatches if file scopes don't overlap
-- If Codex fails gate, either fix locally or rewrite the ticket and re-dispatch
-- After applying Codex results, always run gate and check cross-ticket interactions before merging
+```
+New ticket created
+  │
+  ├─ Pure new file? (new module, new endpoint, new test file)
+  │   └─ ALWAYS DISPATCH. No exceptions.
+  │
+  ├─ Alembic migration?
+  │   └─ ALWAYS DIRECT. Migrations are lead-only.
+  │
+  ├─ Modifies ONLY shared interfaces? (base classes, config schema, DB models)
+  │   └─ Implement directly. Log reason in PROGRESS.md.
+  │
+  ├─ Modifies shared interfaces AND implementation files?
+  │   └─ SPLIT: shared interface changes → direct, implementation → dispatch
+  │
+  ├─ Single-file modification? (bug fix, tuning, config change, new test)
+  │   └─ ALWAYS DISPATCH. No exceptions.
+  │
+  └─ Integration wiring? (<50 lines, connecting dispatched work)
+      └─ Implement directly. This is your core job.
+```
 
 ---
 
@@ -191,27 +239,60 @@ Files/dirs to touch:
 
 When the user gives a feature request:
 
-1. **Plan** — Create an implementation plan and split into 3–7 tickets. Surface any architectural decisions or tradeoffs before starting.
+1. **Plan** — Create an implementation plan and split into 5–10 tickets.
+   - Each ticket should target 1–2 files maximum.
+   - If a ticket touches 3+ files, split it further.
+   - Surface any architectural decisions or tradeoffs before starting.
+
 2. **Sequence** — Order tickets by dependency. Identify which can parallelize.
-3. **Delegate** — For isolated implementation tickets, dispatch to Codex Pro:
-   ```bash
-   bash tools/codex_dispatch.sh tickets/<ticket>.md
+
+3. **Classify each ticket**:
+   - 🟢 DISPATCH: New file, single module change, test addition, config change, bug fix, new endpoint
+   - 🔴 DIRECT: Alembic migration, shared interface modification, plugin base class change, integration wiring (<50 lines)
+   - **If >40% of tickets are DIRECT, you have split them wrong. Re-split until dispatch ratio ≥60%.**
+
+4. **Log classifications** in PROGRESS.md:
    ```
-   - Dispatch up to 3 non-overlapping tickets in parallel
-   - Monitor with: `bash tools/codex_status.sh`
-   - Apply results: `bash tools/codex_apply.sh`
-4. **Implement directly** — Keep architecture/integration/refactor/migration work in the lead worktree. Do not dispatch these to Codex.
-5. **Gate each ticket** — Run gate after each ticket lands:
+   | Ticket | Action | Reason |
+   |--------|--------|--------|
+   | t-101 | 🟢 DISPATCH | standalone new module |
+   | t-102 | 🟢 DISPATCH | single endpoint, no shared interface |
+   | t-103 | 🟢 DISPATCH | test file only |
+   | t-104 | 🔴 DIRECT | Alembic migration (lead-only) |
+   | t-105 | 🔴 DIRECT | integration wiring, 30 lines |
+   
+   Dispatch ratio: 3/5 = 60% ✅
+   ```
+
+5. **Dispatch first, then direct** — Send ALL 🟢 tickets to Codex BEFORE starting 🔴 work:
    ```bash
-   cd ~/github/ml-experiment-hub-wt/gate
-   git fetch origin
-   git reset --hard origin/lead/main
-   rm -rf .venv
+   # Dispatch parallelizable tickets
+   bash tools/codex_dispatch.sh tickets/t-101-registry-data.md &
+   bash tools/codex_dispatch.sh tickets/t-102-registry-api.md &
+   bash tools/codex_dispatch.sh tickets/t-103-registry-tests.md &
+   wait
+   
+   # While Codex works, implement 🔴 DIRECT tickets
+   # (migrations, interface changes, wiring)
+   
+   # When Codex finishes, apply results
+   bash tools/codex_apply.sh
+   ```
+
+6. **Gate** — Run gate after each integration:
+   ```bash
    bash scripts/gate.sh
    ```
-6. **Integrate** — After Codex tickets land, review and integrate in lead worktree. Verify cross-ticket interactions (especially shared imports, DB state, config keys).
-7. **Do not ask** the user for additional commands. Only ask questions if something is truly ambiguous; otherwise make reasonable defaults.
-8. **Summarize** — End by listing what changed (files, endpoints, schemas) and how to run the demo end-to-end.
+
+7. **Integrate** — After Codex tickets land, review and integrate in lead worktree. Verify cross-ticket interactions (especially shared imports, DB state, config keys).
+
+8. **Do not ask** the user for additional commands. Make reasonable defaults.
+
+9. **Summarize** — End by listing:
+   - Dispatch ratio (🟢 dispatched / total tickets)
+   - What was dispatched vs implemented directly (with reasons for each DIRECT)
+   - Files changed, endpoints added, schemas modified
+   - How to run the demo end-to-end
 
 ---
 
@@ -230,3 +311,6 @@ When the user gives a feature request:
 11. **Dispatching DB migration tickets to Codex** — Alembic migrations touch shared schema; always do these in lead worktree.
 12. **Dispatching overlapping tickets in parallel** — check file scopes before parallel dispatch; merge conflicts waste more time than sequential execution.
 13. **Forgetting `rm -rf .venv` before gate on this project** — uv frozen mode will fail if stale venv has wrong packages.
+14. **Implementing tickets directly without justification** — default is DISPATCH. Log every DIRECT decision in PROGRESS.md with a reason.
+15. **Claiming "cross-service" to skip dispatch** — most cross-service features can be split into dispatchable units + small integration wiring. Split first, then decide.
+16. **Dispatch ratio below 60%** — if more than 40% of tickets are DIRECT, the split is wrong. Re-split.

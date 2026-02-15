@@ -17,6 +17,7 @@ from backend.api import (
     runs,
     schemas,
     search,
+    servers,
     settings as settings_api,
     studies,
     system,
@@ -154,6 +155,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     system_monitor.start()
 
+    # Start system history collection service
+    from backend.services.system_history import system_history_service
+
+    system_history_service.start()
+
     # Start queue scheduler
     from backend.services.queue_scheduler import queue_scheduler
 
@@ -175,6 +181,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     from backend.services.queue_scheduler import queue_scheduler
 
     queue_scheduler.stop()
+
+    # Shutdown: Stop system history
+    from backend.services.system_history import system_history_service
+
+    system_history_service.stop()
 
     # Shutdown: Stop system monitor
     from backend.core.system_monitor import system_monitor
@@ -210,6 +221,7 @@ app.include_router(jobs.router)
 app.include_router(search.router)
 app.include_router(studies.router)
 app.include_router(queue.router)
+app.include_router(servers.router)
 app.include_router(settings_api.router)
 app.include_router(predict.router)
 

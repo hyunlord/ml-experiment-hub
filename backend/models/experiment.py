@@ -325,3 +325,57 @@ class DatasetDefinition(SQLModel, table=True):
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Server(SQLModel, table=True):
+    """Registered server for remote monitoring and training.
+
+    Servers can be local (the hub backend itself) or remote
+    (running ml-experiment-hub-agent). The active server determines
+    which system stats and experiments are displayed.
+    """
+
+    __tablename__ = "servers"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True, description="Display name (e.g. 'DGX Spark')")
+    host: str = Field(description="Hostname or IP (e.g. 'localhost', '192.168.1.100')")
+    port: int = Field(default=8000, description="Agent/API port")
+    auth_type: str = Field(
+        default="none",
+        description="Authentication: none, api_key, ssh",
+    )
+    api_key: str = Field(default="", description="API key for authenticated requests")
+    description: str = Field(default="")
+    tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    is_default: bool = Field(default=False, description="Default server on startup")
+    is_local: bool = Field(default=True, description="Local server (no remote agent needed)")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class SystemHistorySnapshot(SQLModel, table=True):
+    """Global system stats snapshot for time-series history.
+
+    Unlike SystemStats (tied to a run), these are collected globally
+    every 10 seconds regardless of whether training is active.
+    Used for the System Monitor history charts.
+    """
+
+    __tablename__ = "system_history"
+    __table_args__ = (Index("ix_system_history_ts", "timestamp"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    server_id: int | None = Field(
+        default=None,
+        foreign_key="servers.id",
+        index=True,
+        description="Which server this snapshot is from (null = local)",
+    )
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    gpu_util: float | None = Field(default=None)
+    gpu_memory_percent: float | None = Field(default=None)
+    gpu_temperature: float | None = Field(default=None)
+    cpu_percent: float | None = Field(default=None)
+    ram_percent: float | None = Field(default=None)
+    disk_percent: float | None = Field(default=None)
