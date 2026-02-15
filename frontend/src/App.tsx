@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import ErrorBoundary from './components/ErrorBoundary'
 import DashboardPage from './pages/DashboardPage'
 import ProjectListPage from './pages/ProjectListPage'
 import ProjectCreatePage from './pages/ProjectCreatePage'
@@ -22,32 +23,34 @@ import SystemPage from './pages/SystemPage'
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/projects" element={<ProjectListPage />} />
-        <Route path="/projects/new" element={<ProjectCreatePage />} />
-        <Route path="/projects/:id" element={<ProjectDetailPage />} />
-        <Route path="/experiments" element={<ExperimentListPage />} />
-        <Route path="/experiments/new" element={<ExperimentCreatePage />} />
-        <Route path="/experiments/:id/edit" element={<ExperimentCreatePage />} />
-        <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
-        <Route path="/runs/:runId" element={<RunMonitorPage />} />
-        <Route path="/compare" element={<ExperimentComparePage />} />
-        <Route path="/experiments/compare" element={<ExperimentComparePage />} />
-        <Route path="/running" element={<RunningPage />} />
-        <Route path="/hyperparam" element={<HyperparamListPage />} />
-        <Route path="/hyperparam/new" element={<HyperparamSearchPage />} />
-        <Route path="/hyperparam/:studyId" element={<HyperparamSearchPage />} />
-        <Route path="/queue" element={<QueuePage />} />
-        <Route path="/datasets" element={<DatasetsPage />} />
-        <Route path="/schemas" element={<SchemasPage />} />
-        <Route path="/system" element={<SystemPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/demo/search" element={<SearchDemoPage />} />
-        <Route path="/demo/classifier" element={<ClassifierDemoPage />} />
-      </Routes>
-    </Layout>
+    <ErrorBoundary>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/projects" element={<ProjectListPage />} />
+          <Route path="/projects/new" element={<ProjectCreatePage />} />
+          <Route path="/projects/:id" element={<ProjectDetailPage />} />
+          <Route path="/experiments" element={<ExperimentListPage />} />
+          <Route path="/experiments/new" element={<ExperimentCreatePage />} />
+          <Route path="/experiments/:id/edit" element={<ExperimentCreatePage />} />
+          <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
+          <Route path="/runs/:runId" element={<RunMonitorPage />} />
+          <Route path="/compare" element={<ExperimentComparePage />} />
+          <Route path="/experiments/compare" element={<ExperimentComparePage />} />
+          <Route path="/running" element={<RunningPage />} />
+          <Route path="/hyperparam" element={<HyperparamListPage />} />
+          <Route path="/hyperparam/new" element={<HyperparamSearchPage />} />
+          <Route path="/hyperparam/:studyId" element={<HyperparamSearchPage />} />
+          <Route path="/queue" element={<QueuePage />} />
+          <Route path="/datasets" element={<DatasetsPage />} />
+          <Route path="/schemas" element={<SchemasPage />} />
+          <Route path="/system" element={<SystemPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/demo/search" element={<SearchDemoPage />} />
+          <Route path="/demo/classifier" element={<ClassifierDemoPage />} />
+        </Routes>
+      </Layout>
+    </ErrorBoundary>
   )
 }
 

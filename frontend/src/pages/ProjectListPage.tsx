@@ -113,12 +113,13 @@ export default function ProjectListPage() {
         /* Project Grid */
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => {
+            const tags = project.tags || []
             const statusCfg = STATUS_CONFIG[project.status] || STATUS_CONFIG.registered
             const sourceTypeCfg = project.source_type ? SOURCE_TYPE_CONFIG[project.source_type] : null
             const truncatedPath =
-              project.path.length > 50
-                ? '...' + project.path.slice(-47)
-                : project.path
+              (project.path || '').length > 50
+                ? '...' + (project.path || '').slice(-47)
+                : (project.path || '')
             const truncatedGitUrl = project.git_url && project.git_url.length > 40
               ? project.git_url.slice(0, 37) + '...'
               : project.git_url
@@ -202,11 +203,11 @@ export default function ProjectListPage() {
                   </div>
 
                   {/* Tags */}
-                  {project.tags.length > 0 && (
+                  {tags.length > 0 && (
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Tag className="h-3.5 w-3.5" />
                       <div className="flex flex-wrap gap-1">
-                        {project.tags.slice(0, 3).map((tag) => (
+                        {tags.slice(0, 3).map((tag) => (
                           <span
                             key={tag}
                             className="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground"
@@ -214,9 +215,9 @@ export default function ProjectListPage() {
                             {tag}
                           </span>
                         ))}
-                        {project.tags.length > 3 && (
+                        {tags.length > 3 && (
                           <span className="text-xs">
-                            +{project.tags.length - 3}
+                            +{tags.length - 3}
                           </span>
                         )}
                       </div>

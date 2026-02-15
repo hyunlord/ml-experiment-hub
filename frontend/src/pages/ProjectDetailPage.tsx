@@ -168,6 +168,27 @@ export default function ProjectDetailPage() {
     )
   }
 
+  // Safe array parser — handles null, undefined, and JSON-string arrays
+  const safeArray = <T,>(val: T[] | string | null | undefined): T[] => {
+    if (Array.isArray(val)) return val
+    if (typeof val === 'string') {
+      try { const parsed = JSON.parse(val); return Array.isArray(parsed) ? parsed : [] } catch { return [] }
+    }
+    return []
+  }
+  const safeScripts = (val: any): { train: string[]; eval: string[]; other: string[] } => {
+    if (!val || typeof val !== 'object') return { train: [], eval: [], other: [] }
+    return {
+      train: safeArray(val.train),
+      eval: safeArray(val.eval),
+      other: safeArray(val.other),
+    }
+  }
+
+  // Compute safe values once
+  const configs = safeArray(project.detected_configs)
+  const scripts = safeScripts(project.detected_scripts)
+
   const statusConfig: Record<ProjectStatus, { label: string; classes: string }> = {
     [ProjectStatus.REGISTERED]: { label: 'Registered', classes: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
     [ProjectStatus.CLONING]: { label: 'Cloning', classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
@@ -361,11 +382,11 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Detected Config Files */}
-      {project.detected_configs.length > 0 && (
+      {configs.length > 0 && (
         <div className="mb-6 rounded-lg border border-border bg-card p-6">
           <h2 className="mb-4 text-lg font-semibold text-card-foreground">Detected Config Files</h2>
           <div className="space-y-2">
-            {project.detected_configs.map((config) => {
+            {configs.map((config) => {
               const isExpanded = !!expandedConfig[config.path]
               const isLoading = loadingConfig[config.path]
               const sizeKB = (config.size / 1024).toFixed(1)
@@ -429,9 +450,9 @@ export default function ProjectDetailPage() {
               <Terminal className="h-4 w-4" />
               Train Scripts
             </h3>
-            {project.detected_scripts.train.length > 0 ? (
+            {scripts.train.length > 0 ? (
               <ul className="space-y-1">
-                {project.detected_scripts.train.map((script) => (
+                {scripts.train.map((script) => (
                   <li key={script} className="flex items-center gap-2 text-sm">
                     <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
                     <code className="truncate font-mono text-xs text-foreground" title={script}>
@@ -451,9 +472,9 @@ export default function ProjectDetailPage() {
               <FlaskConical className="h-4 w-4" />
               Eval Scripts
             </h3>
-            {project.detected_scripts.eval.length > 0 ? (
+            {scripts.eval.length > 0 ? (
               <ul className="space-y-1">
-                {project.detected_scripts.eval.map((script) => (
+                {scripts.eval.map((script) => (
                   <li key={script} className="flex items-center gap-2 text-sm">
                     <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
                     <code className="truncate font-mono text-xs text-foreground" title={script}>
@@ -473,9 +494,9 @@ export default function ProjectDetailPage() {
               <FileCode className="h-4 w-4" />
               Other Scripts
             </h3>
-            {project.detected_scripts.other.length > 0 ? (
+            {scripts.other.length > 0 ? (
               <ul className="space-y-1">
-                {project.detected_scripts.other.map((script) => (
+                {scripts.other.map((script) => (
                   <li key={script} className="flex items-center gap-2 text-sm">
                     <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
                     <code className="truncate font-mono text-xs text-foreground" title={script}>
