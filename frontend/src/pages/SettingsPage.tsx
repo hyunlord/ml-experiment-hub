@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Bell,
   Check,
+  Clock,
   Cpu,
   Database,
   FolderOpen,
@@ -29,6 +30,8 @@ import {
   type ConnectionTestResult,
 } from '@/api/servers'
 import { useServerStore } from '@/stores/serverStore'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { getDetectedTimezone } from '@/utils/time'
 
 // ---------------------------------------------------------------------------
 // Alert threshold defaults (stored in localStorage)
@@ -118,6 +121,9 @@ export default function SettingsPage() {
 
   // Alert thresholds
   const [thresholds, setThresholds] = useState<AlertThresholds>(loadThresholds)
+
+  // Timezone settings
+  const { timezone, setTimezone } = useSettingsStore()
 
   // Load data
   useEffect(() => {
@@ -235,6 +241,48 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="space-y-6">
+        {/* ── Time Display ── */}
+        <Section title="Time Display" icon={<Clock className="h-5 w-5" />}>
+          <p className="text-xs text-muted-foreground">
+            Choose how timestamps are displayed across the application.
+          </p>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="timezone"
+                value="local"
+                checked={timezone === 'local'}
+                onChange={() => setTimezone('local')}
+                className="h-4 w-4 text-primary focus:ring-2 focus:ring-ring"
+              />
+              <div>
+                <span className="text-sm font-medium text-foreground">Local Time</span>
+                <p className="text-xs text-muted-foreground">Use your browser's timezone</p>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="timezone"
+                value="utc"
+                checked={timezone === 'utc'}
+                onChange={() => setTimezone('utc')}
+                className="h-4 w-4 text-primary focus:ring-2 focus:ring-ring"
+              />
+              <div>
+                <span className="text-sm font-medium text-foreground">UTC</span>
+                <p className="text-xs text-muted-foreground">Display all times in Coordinated Universal Time</p>
+              </div>
+            </label>
+          </div>
+          <div className="mt-2 rounded-md bg-muted px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Detected: <span className="font-medium text-foreground">{getDetectedTimezone()}</span>
+            </p>
+          </div>
+        </Section>
+
         {/* ── Servers ── */}
         <Section title="Servers" icon={<Server className="h-5 w-5" />}>
           {serversLoading ? (

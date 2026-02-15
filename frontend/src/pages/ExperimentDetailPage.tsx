@@ -5,6 +5,7 @@ import { useExperimentStore } from '@/stores/experimentStore'
 import StatusBadge from '@/components/StatusBadge'
 import MetricsChart from '@/components/MetricsChart'
 import { ExperimentStatus } from '@/types/experiment'
+import { formatAbsoluteTime } from '@/utils/time'
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -121,7 +122,7 @@ export default function ExperimentDetailPage() {
               Created
             </h3>
             <p className="text-card-foreground">
-              {new Date(selectedExperiment.created_at).toLocaleString()}
+              {formatAbsoluteTime(selectedExperiment.created_at)}
             </p>
           </div>
           {selectedExperiment.tags.length > 0 && (
@@ -210,7 +211,7 @@ export default function ExperimentDetailPage() {
                   </span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {run.started_at ? new Date(run.started_at).toLocaleString() : ''}
+                  {run.started_at ? formatAbsoluteTime(run.started_at) : ''}
                 </span>
               </div>
             ))}

@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.base import TimezoneAwareResponse
 from shared.schemas import ExperimentConfigStatus, RunStatus
 
 
@@ -27,7 +28,7 @@ class ExperimentUpdate(BaseModel):
     tags: list[str] | None = None
 
 
-class ExperimentResponse(BaseModel):
+class ExperimentResponse(TimezoneAwareResponse):
     """Schema for experiment configuration response."""
 
     id: int
@@ -40,11 +41,6 @@ class ExperimentResponse(BaseModel):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        """Pydantic configuration."""
-
-        from_attributes = True
 
     @classmethod
     def from_model(cls, model: Any) -> "ExperimentResponse":
@@ -84,7 +80,7 @@ class ExperimentDiffResponse(BaseModel):
     changed: dict[str, Any] = Field(default_factory=dict)
 
 
-class RunResponse(BaseModel):
+class RunResponse(TimezoneAwareResponse):
     """Schema for experiment run response."""
 
     id: int
@@ -97,13 +93,8 @@ class RunResponse(BaseModel):
     started_at: datetime | None
     ended_at: datetime | None
 
-    class Config:
-        """Pydantic configuration."""
 
-        from_attributes = True
-
-
-class MetricLogResponse(BaseModel):
+class MetricLogResponse(TimezoneAwareResponse):
     """Schema for metric log response."""
 
     id: int
@@ -112,11 +103,6 @@ class MetricLogResponse(BaseModel):
     epoch: int | None
     timestamp: datetime
     metrics_json: dict[str, Any]
-
-    class Config:
-        """Pydantic configuration."""
-
-        from_attributes = True
 
 
 class DryRunResponse(BaseModel):
@@ -141,7 +127,7 @@ class RunSummaryResponse(BaseModel):
     duration_seconds: float | None
 
 
-class CheckpointEntry(BaseModel):
+class CheckpointEntry(TimezoneAwareResponse):
     """Single checkpoint file info."""
 
     path: str

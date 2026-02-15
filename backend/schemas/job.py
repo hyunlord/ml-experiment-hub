@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.base import TimezoneAwareResponse
 from shared.schemas import JobStatus, JobType
 
 
@@ -46,7 +47,7 @@ class IndexBuildJobRequest(BaseModel):
     batch_size: int = Field(default=32)
 
 
-class JobResponse(BaseModel):
+class JobResponse(TimezoneAwareResponse):
     """Response schema for a job."""
 
     id: int
@@ -60,9 +61,6 @@ class JobResponse(BaseModel):
     started_at: datetime | None
     ended_at: datetime | None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class JobProgressUpdate(BaseModel):

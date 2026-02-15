@@ -36,6 +36,7 @@ import {
 } from '@/api/queue'
 import { cn } from '@/lib/utils'
 import client from '@/api/client'
+import { formatAbsoluteTime } from '@/utils/time'
 
 // ---------------------------------------------------------------------------
 // Status config
@@ -203,9 +204,9 @@ function SortableQueueItem({
           {entry.experiment_name}
         </p>
         <p className="text-xs text-muted-foreground">
-          Added {new Date(entry.added_at).toLocaleString()}
+          Added {formatAbsoluteTime(entry.added_at)}
           {entry.started_at && (
-            <> &middot; Started {new Date(entry.started_at).toLocaleString()}</>
+            <> &middot; Started {formatAbsoluteTime(entry.started_at)}</>
           )}
         </p>
       </div>
@@ -447,7 +448,7 @@ export default function QueuePage() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {entry.completed_at &&
-                        new Date(entry.completed_at).toLocaleString()}
+                        formatAbsoluteTime(entry.completed_at)}
                       {entry.error_message && (
                         <span className="ml-1 text-destructive">
                           — {entry.error_message}

@@ -29,6 +29,7 @@ import {
 import axios from 'axios'
 import { getSystemHistory, type HistoryPoint } from '@/api/system'
 import { loadThresholds } from './SettingsPage'
+import { formatChartTime, formatAbsoluteTime } from '@/utils/time'
 
 // ---------------------------------------------------------------------------
 // Types (matching enhanced backend API)
@@ -934,15 +935,12 @@ export default function SystemPage() {
                     dataKey="timestamp"
                     stroke="hsl(var(--muted-foreground))"
                     tick={{ fontSize: 10 }}
-                    tickFormatter={(v: string) => {
-                      const d = new Date(v)
-                      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-                    }}
+                    tickFormatter={(v: string) => formatChartTime(v)}
                   />
                   <YAxis domain={[0, 100]} stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
                   <Tooltip
                     contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                    labelFormatter={(v: string) => new Date(v).toLocaleTimeString()}
+                    labelFormatter={(v: string) => formatAbsoluteTime(v)}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Line type="monotone" dataKey="cpu_percent" name="CPU %" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
@@ -962,15 +960,12 @@ export default function SystemPage() {
                       dataKey="timestamp"
                       stroke="hsl(var(--muted-foreground))"
                       tick={{ fontSize: 10 }}
-                      tickFormatter={(v: string) => {
-                        const d = new Date(v)
-                        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-                      }}
+                      tickFormatter={(v: string) => formatChartTime(v)}
                     />
                     <YAxis domain={[0, 100]} stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                      labelFormatter={(v: string) => new Date(v).toLocaleTimeString()}
+                      labelFormatter={(v: string) => formatAbsoluteTime(v)}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Line type="monotone" dataKey="gpu_util" name="GPU Util %" stroke="#10b981" dot={false} strokeWidth={1.5} />
@@ -991,15 +986,12 @@ export default function SystemPage() {
                       dataKey="timestamp"
                       stroke="hsl(var(--muted-foreground))"
                       tick={{ fontSize: 10 }}
-                      tickFormatter={(v: string) => {
-                        const d = new Date(v)
-                        return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-                      }}
+                      tickFormatter={(v: string) => formatChartTime(v)}
                     />
                     <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
                     <Tooltip
                       contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                      labelFormatter={(v: string) => new Date(v).toLocaleTimeString()}
+                      labelFormatter={(v: string) => formatAbsoluteTime(v)}
                     />
                     <Line type="monotone" dataKey="gpu_temperature" name="Temp °C" stroke="#ef4444" dot={false} strokeWidth={1.5} />
                   </LineChart>

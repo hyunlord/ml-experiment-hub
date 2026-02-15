@@ -31,6 +31,7 @@ import {
 } from '@/api/projects'
 import type { Project, GitInfo, ConfigContent } from '@/types/project'
 import { ProjectStatus } from '@/types/project'
+import { formatAbsoluteTime } from '@/utils/time'
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -540,7 +541,7 @@ export default function ProjectDetailPage() {
                   )}
                   {gitInfo.last_commit_date && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(gitInfo.last_commit_date).toLocaleString()}
+                      {formatAbsoluteTime(gitInfo.last_commit_date)}
                     </p>
                   )}
                 </div>

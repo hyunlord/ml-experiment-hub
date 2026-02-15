@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.base import TimezoneAwareResponse
 from shared.schemas import JobStatus, TrialStatus
 
 
@@ -36,7 +37,7 @@ class CreateStudyRequest(BaseModel):
     direction: str = Field(default="maximize")
 
 
-class TrialResultResponse(BaseModel):
+class TrialResultResponse(TimezoneAwareResponse):
     """Response for a single trial result."""
 
     id: int
@@ -49,11 +50,8 @@ class TrialResultResponse(BaseModel):
     intermediate_values_json: dict[str, Any]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
-
-class StudyResponse(BaseModel):
+class StudyResponse(TimezoneAwareResponse):
     """Response for a study."""
 
     id: int
@@ -75,11 +73,8 @@ class StudyResponse(BaseModel):
     completed_at: datetime | None
     trials: list[TrialResultResponse] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
 
-
-class StudySummaryResponse(BaseModel):
+class StudySummaryResponse(TimezoneAwareResponse):
     """Lightweight study response without trials."""
 
     id: int
@@ -92,9 +87,6 @@ class StudySummaryResponse(BaseModel):
     direction: str
     created_at: datetime
     completed_at: datetime | None
-
-    class Config:
-        from_attributes = True
 
 
 class TrialProgressUpdate(BaseModel):

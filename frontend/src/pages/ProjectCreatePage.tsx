@@ -345,13 +345,19 @@ export default function ProjectCreatePage() {
   };
 
   const extractRepoName = (url: string): string => {
-    const match = url.match(/\/([^\/]+?)(\.git)?$/);
-    return match ? match[1].replace('.git', '') : '';
+    try {
+      // Remove trailing slashes and .git
+      const cleaned = url.replace(/\/+$/, '').replace(/\.git$/, '');
+      const parts = cleaned.split('/');
+      return parts[parts.length - 1] || '';
+    } catch {
+      return '';
+    }
   };
 
   const canProceedStep1 = () => {
     if (sourceType === 'github') {
-      return formData.git_url.trim() && cloneStatus?.status === 'completed';
+      return formData.git_url.trim() && cloneStatus?.status === 'completed' && formData.name.trim().length > 0;
     }
     if (sourceType === 'local') {
       return formData.name.trim() && scanResults?.exists;
@@ -863,6 +869,24 @@ function GitHubStep1({
               variant={cloneStatus.scan_result.python_env ? 'success' : 'neutral'}
             />
           </div>
+        </div>
+      )}
+
+      {cloneStatus?.status === 'completed' && (
+        <div>
+          <label className="block text-sm font-medium text-foreground mb-2">
+            Project Name <span className="text-destructive">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => onInputChange('name', e.target.value)}
+            placeholder="my-project"
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Auto-detected from repository URL. You can change it.
+          </p>
         </div>
       )}
 

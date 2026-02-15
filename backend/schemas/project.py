@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from backend.schemas.base import TimezoneAwareResponse
 from shared.schemas import ProjectStatus
 
 
@@ -150,7 +151,7 @@ class GitCredentialCreate(BaseModel):
     token: str = Field(min_length=1)
 
 
-class GitCredentialResponse(BaseModel):
+class GitCredentialResponse(TimezoneAwareResponse):
     """Schema for git credential response (token masked)."""
 
     id: int
@@ -158,9 +159,6 @@ class GitCredentialResponse(BaseModel):
     provider: str
     token_masked: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class GitCredentialListResponse(BaseModel):
@@ -247,7 +245,7 @@ class ProjectUpdate(BaseModel):
     tags: list[str] | None = None
 
 
-class ProjectResponse(BaseModel):
+class ProjectResponse(TimezoneAwareResponse):
     """Schema for project response."""
 
     id: int
@@ -276,9 +274,6 @@ class ProjectResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     experiment_count: int = 0
-
-    class Config:
-        from_attributes = True
 
     @classmethod
     def from_model(cls, model: Any, experiment_count: int = 0) -> "ProjectResponse":

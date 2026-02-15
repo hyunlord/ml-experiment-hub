@@ -8,6 +8,7 @@ import {
   cancelJob,
   type JobResponse,
 } from '@/api/jobs'
+import { formatAbsoluteTime } from '@/utils/time'
 
 interface EvalTabProps {
   runId: number
@@ -286,7 +287,7 @@ function EvalResultCard({ job }: { job: JobResponse }) {
           Checkpoint: {String(checkpoint)}
         </span>
         <span className="text-xs text-muted-foreground">
-          Job #{job.id} &middot; {new Date(job.created_at).toLocaleString()}
+          Job #{job.id} &middot; {formatAbsoluteTime(job.created_at)}
         </span>
       </div>
       <div className="overflow-x-auto">
