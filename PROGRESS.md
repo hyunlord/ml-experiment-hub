@@ -1,3 +1,66 @@
+# Milestone 4 Progress
+
+## Status: COMPLETE
+
+## Tickets
+
+| Ticket | Description | Status |
+|--------|-------------|--------|
+| T-015 | BaseSearchEngine plugin interface + registry | DONE |
+| T-016 | OptunaEngine implementation (with graceful fallback) | DONE |
+| T-017 | Adapter get_search_ranges() method | DONE |
+| T-018 | Study DB model + API endpoints | DONE (pre-existing) |
+| T-019 | Study creation / monitoring frontend | DONE (pre-existing) |
+| T-020 | Param importance calculation | DONE (pre-existing) |
+| T-021 | Best trial → new experiment button | DONE (pre-existing) |
+| T-022 | Fix genericity (val/map_i2t default) | DONE |
+| T-023 | Optuna optional dependency + tests | DONE |
+
+## Completion Criteria
+- [x] Search setup UI: parameter fixed/search toggle + min/max ranges
+- [x] Adapter recommended ranges (get_search_ranges())
+- [x] Search engine plugin structure (BaseSearchEngine interface)
+- [x] Optuna engine with TPE (real) + random fallback (no optuna)
+- [x] Settings: n_trials, search_epochs, subset_ratio, pruner, direction
+- [x] Start Search → background job execution
+- [x] Trial progress monitoring (current trial # / total)
+- [x] Objective value chart (trial-by-trial + best-so-far line)
+- [x] Best trial highlight with params summary
+- [x] Parameter importance chart (after search completion)
+- [x] "Create Experiment from Best Trial" button
+- [x] No vlm-specific terms in core code
+- [x] gate.sh PASS (176 tests, 1 skipped, smoke OK)
+
+## Changes Summary
+
+### Backend — Search Engine Plugin Interface
+- **core/search_engine.py**: BaseSearchEngine ABC with run_search(), get_name(),
+  get_param_importance(); engine registry (register_engine/get_engine/list_engines);
+  TrialResult/SearchResult dataclasses
+- **engines/__init__.py**: Auto-imports OptunaEngine on load
+- **engines/optuna_engine.py**: OptunaEngine — uses real optuna.create_study + TPE
+  when installed, falls back to random sampling; dummy objective for E2E testing;
+  fANOVA param importance via optuna.importance when available
+
+### Backend — Adapter Search Ranges
+- **adapters/base.py**: Added get_search_ranges() optional method
+- **adapters/vlm_quantization/adapter.py**: Implemented recommended ranges
+  (lr, temperature, quantization_weight, balance_weight, hash_dim)
+
+### Backend — Genericity Fix
+- **models/experiment.py**: Changed default objective_metric from "val/map_i2t" to "val/loss"
+- **schemas/optuna.py**: Same default change in CreateStudyRequest
+
+### Dependencies
+- **pyproject.toml**: Added `optuna = ["optuna>=3.0.0"]` as optional dependency
+
+### Tests
+- **test_milestone4.py**: 29 tests covering engine registry, run_search, param sampling,
+  importance, adapter ranges, schema validation, genericity checks
+- 176 tests pass total, 1 skipped, gate.sh PASS
+
+---
+
 # Milestone 3 Progress
 
 ## Status: COMPLETE
