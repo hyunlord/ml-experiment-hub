@@ -1,4 +1,4 @@
-"""Compatibility bridge for vlm_quantization MonitorCallback.
+"""Compatibility bridge for adapter MonitorCallback.
 
 Translates MonitorCallback's endpoint format to ml-experiment-hub's
 internal metrics ingestion pipeline. This allows the training script

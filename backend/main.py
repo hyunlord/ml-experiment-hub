@@ -12,6 +12,7 @@ from backend.api import (
     experiments,
     jobs,
     metrics,
+    predict,
     queue,
     runs,
     schemas,
@@ -210,6 +211,7 @@ app.include_router(search.router)
 app.include_router(studies.router)
 app.include_router(queue.router)
 app.include_router(settings_api.router)
+app.include_router(predict.router)
 
 
 @app.get("/")

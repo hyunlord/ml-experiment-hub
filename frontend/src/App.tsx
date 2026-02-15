@@ -10,6 +10,7 @@ import SchemasPage from './pages/SchemasPage'
 import SettingsPage from './pages/SettingsPage'
 import RunningPage from './pages/RunningPage'
 import SearchDemoPage from './pages/SearchDemoPage'
+import ClassifierDemoPage from './pages/ClassifierDemoPage'
 import HyperparamListPage from './pages/HyperparamListPage'
 import HyperparamSearchPage from './pages/HyperparamSearchPage'
 import QueuePage from './pages/QueuePage'
@@ -38,6 +39,7 @@ function App() {
         <Route path="/system" element={<SystemPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/demo/search" element={<SearchDemoPage />} />
+        <Route path="/demo/classifier" element={<ClassifierDemoPage />} />
       </Routes>
     </Layout>
   )

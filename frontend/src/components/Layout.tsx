@@ -12,6 +12,7 @@ import {
   Play,
   Search,
   Settings,
+  Shapes,
   SlidersHorizontal,
   Sun,
   Wrench,
@@ -78,6 +79,11 @@ function useNavItems(): NavItem[] {
       to: '/demo/search',
       label: 'Search Demo',
       icon: <Search className="h-5 w-5" />,
+    },
+    {
+      to: '/demo/classifier',
+      label: 'Classify Demo',
+      icon: <Shapes className="h-5 w-5" />,
     },
     {
       to: '/system',
@@ -198,6 +204,7 @@ function TopBar() {
     if (path === '/queue') return 'Experiment Queue'
     if (path === '/datasets') return 'Datasets'
     if (path === '/demo/search') return 'Search Demo'
+    if (path === '/demo/classifier') return 'Classifier Demo'
     if (path === '/system') return 'System Monitor'
     if (path === '/schemas') return 'Schemas'
     if (path === '/settings') return 'Settings'

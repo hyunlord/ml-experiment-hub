@@ -1,3 +1,116 @@
+# Milestone 7 Progress
+
+## Status: COMPLETE
+
+## Objective
+
+Real model E2E pipeline + production stabilization + universality proof.
+Prove the platform is genuinely generic by adding a second, completely different
+model type (image classification) alongside the existing cross-modal retrieval adapter.
+
+## Completion Criteria
+
+### Dummy Classifier Adapter (Universality Proof)
+- [x] `adapters/dummy_classifier/model.py` — SimpleCNN (MNIST + CIFAR-10)
+- [x] `adapters/dummy_classifier/train.py` — Standalone training script with JSON metric output
+- [x] `adapters/dummy_classifier/evaluator.py` — Per-class precision/recall/F1
+- [x] `adapters/dummy_classifier/adapter.py` — Full BaseAdapter implementation
+- [x] Registered in adapter registry (`adapters/__init__.py`)
+- [x] Training, metrics parsing, hyperparameter search ranges all work
+
+### Predict API (Generic Inference)
+- [x] `POST /api/predict/image` — generic endpoint routing through adapter registry
+- [x] Supports any adapter with `predict()` method
+- [x] Model cache for loaded checkpoints
+- [x] Frontend Classifier Demo page (`/demo/classifier`)
+- [x] Drag-and-drop image upload, confidence bar chart
+
+### Platform Genericity Hardening
+- [x] Removed `vlm_quantization` default from search API (adapter_name now required)
+- [x] Removed vlm-specific comments from `system.py`, `compat.py`, `search.py`
+- [x] Frontend search API updated to pass `adapter_name` parameter
+- [x] No forbidden terms (vlm, siglip, hash, coco) in `backend/api/`, `backend/core/`, `shared/schemas.py`
+
+### Production Stabilization (Pre-existing from earlier milestones)
+- [x] SQLite WAL mode + composite indexes on MetricLog
+- [x] Server restart recovery (PID liveness check, orphan run cleanup)
+- [x] OOM detection (CUDA out of memory parsing)
+- [x] Disk space warnings (< 2 GB threshold)
+- [x] GPU temperature alerts (85°C warning, 95°C critical)
+- [x] Log rotation + compression (7-day archive)
+- [x] Metric archival for old runs
+- [x] Docker healthcheck + memory limits
+- [x] DGX Spark config preset
+
+### Documentation
+- [x] `docs/new-adapter-guide.md` — Step-by-step guide using dummy_classifier as example
+- [x] `README.md` — Updated with adapter system, available adapters table, classifier demo
+- [x] PROGRESS.md updated
+
+### Tests & Gate
+- [x] 258 tests pass, 1 skipped
+- [x] ruff lint: all checks pass
+- [x] ruff format: all files formatted
+- [x] TypeScript: 0 errors (tsc --noEmit)
+
+## Changes Summary
+
+### Adapters — Dummy Classifier (NEW)
+- **adapters/dummy_classifier/__init__.py**: Re-export
+- **adapters/dummy_classifier/model.py**: SimpleCNN — Conv2d(in→32)→ReLU→Pool→Conv2d(32→64)→
+  AdaptiveAvgPool(4)→Linear(1024→128)→Linear(128→num_classes); load_model() from checkpoint
+- **adapters/dummy_classifier/train.py**: Standalone training — MNIST/CIFAR-10 via torchvision,
+  JSON metric lines to stdout, per-epoch checkpoints with best.pt tracking
+- **adapters/dummy_classifier/evaluator.py**: evaluate() returns accuracy, per-class P/R/F1, macro_f1
+- **adapters/dummy_classifier/adapter.py**: DummyClassifierAdapter — config_to_yaml, get_train_command,
+  parse_metrics (JSON + key=value fallback), get_metrics_mapping (train/val loss + accuracy),
+  get_search_ranges (lr/batch_size/epochs), load_model, predict (top-5 with confidence)
+
+### Adapters — Base Interface
+- **adapters/base.py**: Added predict(model, image_bytes, **kwargs) optional method
+- **adapters/__init__.py**: Registered DummyClassifierAdapter in ADAPTER_REGISTRY
+
+### Backend — Predict API (NEW)
+- **backend/api/predict.py**: POST /api/predict/image — multipart form (file, adapter_name,
+  checkpoint_path, class_names); in-memory model cache; routes through adapter.predict()
+- **backend/main.py**: Registered predict router
+
+### Backend — Genericity Fixes
+- **backend/api/search.py**: Changed adapter_name from Form(default="vlm_quantization") to
+  Form(...) (required); removed vlm references from docstrings
+- **backend/api/system.py**: Changed vlm_quantization comment to generic text
+- **backend/api/compat.py**: Changed vlm_quantization docstring to generic "adapter"
+
+### Frontend — Classifier Demo (NEW)
+- **frontend/src/pages/ClassifierDemoPage.tsx**: Image upload with drag-and-drop, checkpoint/adapter
+  config, calls POST /api/predict/image, displays top prediction + confidence bar chart
+- **frontend/src/App.tsx**: Added /demo/classifier route
+- **frontend/src/components/Layout.tsx**: Added Shapes icon, Classify Demo nav item
+
+### Frontend — Search API Update
+- **frontend/src/api/jobs.ts**: Added adapter_name parameter to searchByText and searchByImage
+
+### Dependencies
+- **pyproject.toml**: Added torchvision>=0.15.0
+
+### Documentation
+- **docs/new-adapter-guide.md**: Step-by-step guide (8 steps) using dummy_classifier as example
+- **README.md**: Updated with adapter plugin system, available adapters table, classifier demo
+
+### Tests
+- **tests/test_milestone7.py**: Added 28 new tests in 8 classes:
+  - TestDummyClassifierRegistration (3): registry presence, get_adapter, instance type
+  - TestSimpleCNN (3): MNIST forward, CIFAR-10 forward, save/load roundtrip
+  - TestDummyClassifierAdapter (10): all interface methods including predict
+  - TestEvaluator (1): classification report structure
+  - TestPredictAPI (2): route existence, router registration
+  - TestBaseAdapterPredict (1): raises NotImplementedError on base
+  - TestGenericity (4): no forbidden terms in api/schemas/core/predict
+  - TestTwoAdaptersCoexist (4): both adapters in registry with different names/metrics/ranges
+- 258 tests pass total, 1 skipped, gate.sh PASS
+
+---
+
 # Milestone 6 Progress
 
 ## Status: COMPLETE

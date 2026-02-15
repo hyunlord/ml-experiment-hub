@@ -132,3 +132,16 @@ class BaseAdapter(ABC):
             Dict with 'results', 'query_hash', 'search_time_ms', etc.
         """
         raise NotImplementedError(f"{self.get_name()} does not support image search")
+
+    # ------------------------------------------------------------------
+    # Optional: generic inference / prediction
+    # Override in adapter subclasses that support single-input prediction.
+    # ------------------------------------------------------------------
+
+    def predict(self, model: Any, image_bytes: bytes, **kwargs: Any) -> dict[str, Any]:
+        """Run inference on a single input (e.g. classify an image).
+
+        Returns:
+            Dict with adapter-specific prediction results.
+        """
+        raise NotImplementedError(f"{self.get_name()} does not support prediction")
