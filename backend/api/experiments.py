@@ -51,6 +51,26 @@ async def list_experiments(
     )
 
 
+@router.get("/check-name")
+async def check_experiment_name(
+    name: str = Query(min_length=1),
+    project_id: int | None = Query(default=None),
+    exclude_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Check if experiment name is available within a project scope."""
+    service = ExperimentService(session)
+    available, suggestion = await service.check_name_available(
+        name=name,
+        project_id=project_id,
+        exclude_id=exclude_id,
+    )
+    result: dict = {"available": available}
+    if not available and suggestion:
+        result["suggestion"] = suggestion
+    return result
+
+
 @router.post("", response_model=ExperimentResponse, status_code=201)
 async def create_experiment(
     data: ExperimentCreate,
