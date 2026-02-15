@@ -84,9 +84,6 @@ dist/
 logs/
 *.log
 
-# Tickets
-tickets/
-
 # ML artifacts
 experiments/
 checkpoints/
