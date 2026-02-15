@@ -21,7 +21,6 @@ export default function ExperimentDetailPage() {
     startRun,
     stopRun,
     deleteExperiment,
-    cloneExperiment,
     clearMetrics,
   } = useExperimentStore()
 
@@ -56,10 +55,9 @@ export default function ExperimentDetailPage() {
     }
   }
 
-  const handleClone = async () => {
+  const handleClone = () => {
     if (id) {
-      const clone = await cloneExperiment(id)
-      navigate(`/experiments/${clone.id}`)
+      navigate(`/experiments/new?clone_from=${id}`)
     }
   }
 

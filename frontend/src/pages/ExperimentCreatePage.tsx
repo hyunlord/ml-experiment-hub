@@ -105,6 +105,9 @@ export default function ExperimentCreatePage() {
   const [dryRunning, setDryRunning] = useState(false)
   const [draftId, setDraftId] = useState<number | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const [nameError, setNameError] = useState('')
+  const [nameSuggestion, setNameSuggestion] = useState('')
+  const [nameCheckTimer, setNameCheckTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Derived: selected project ───────────────────────────────────
   const selectedProject = useMemo(
@@ -183,7 +186,7 @@ export default function ExperimentCreatePage() {
   useEffect(() => {
     const projectIdParam = searchParams.get('project_id')
     const configParam = searchParams.get('config')
-    const cloneParam = searchParams.get('clone')
+    const cloneFromParam = searchParams.get('clone_from')
 
     if (projectIdParam && !projectsLoading) {
       const pid = Number(projectIdParam)
@@ -193,12 +196,12 @@ export default function ExperimentCreatePage() {
       }
     }
 
-    if (cloneParam) {
+    if (cloneFromParam) {
       client
-        .get(`/experiments/${cloneParam}`)
+        .get(`/experiments/${cloneFromParam}`)
         .then((res) => {
           const exp = res.data
-          setName(exp.name ? `${exp.name} (copy)` : '')
+          setName(exp.name ? `${exp.name}_copy` : '')
           setDescription(exp.description || '')
           setTags(exp.tags || [])
           if (exp.project_id) setSelectedProjectId(exp.project_id)
@@ -401,6 +404,33 @@ export default function ExperimentCreatePage() {
       addTag()
     }
   }
+
+  // ── Name change with debounced uniqueness check ────────────────
+  const handleNameChange = useCallback(
+    (newName: string) => {
+      setName(newName)
+      setNameError('')
+      setNameSuggestion('')
+      if (nameCheckTimer) clearTimeout(nameCheckTimer)
+      if (!newName.trim()) return
+      const timer = setTimeout(() => {
+        const params = new URLSearchParams({ name: newName.trim() })
+        if (selectedProjectId) params.set('project_id', String(selectedProjectId))
+        if (isEditMode && editId) params.set('exclude_id', editId)
+        client
+          .get(`/experiments/check-name?${params}`)
+          .then((res) => {
+            if (!res.data.available) {
+              setNameError('Name already exists')
+              setNameSuggestion(res.data.suggestion || '')
+            }
+          })
+          .catch(() => {})
+      }, 500)
+      setNameCheckTimer(timer)
+    },
+    [nameCheckTimer, selectedProjectId, isEditMode, editId],
+  )
 
   // ── Save handlers ───────────────────────────────────────────────
   const buildPayload = (): ExperimentCreatePayload => ({
@@ -606,10 +636,31 @@ export default function ExperimentCreatePage() {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => handleNameChange(e.target.value)}
                 placeholder="experiment-name"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className={cn(
+                  'w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring',
+                  nameError ? 'border-destructive' : 'border-input',
+                )}
               />
+              {nameError && (
+                <div className="mt-1 text-xs text-destructive">
+                  {nameError}
+                  {nameSuggestion && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setName(nameSuggestion)
+                        setNameError('')
+                        setNameSuggestion('')
+                      }}
+                      className="ml-2 text-primary underline hover:no-underline"
+                    >
+                      Use &quot;{nameSuggestion}&quot;
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -900,7 +951,7 @@ export default function ExperimentCreatePage() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            disabled={saving || !name.trim()}
+            disabled={saving || !name.trim() || !!nameError}
             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
@@ -909,7 +960,7 @@ export default function ExperimentCreatePage() {
           <button
             type="button"
             onClick={handleDryRun}
-            disabled={saving || dryRunning || !name.trim()}
+            disabled={saving || dryRunning || !name.trim() || !!nameError}
             className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Eye className="h-4 w-4" />
@@ -918,7 +969,7 @@ export default function ExperimentCreatePage() {
           <button
             type="button"
             onClick={handleSaveAndStart}
-            disabled={saving || !name.trim()}
+            disabled={saving || !name.trim() || !!nameError}
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="h-4 w-4" />

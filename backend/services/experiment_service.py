@@ -68,6 +68,9 @@ class ExperimentService:
 
     async def create_experiment(self, data: ExperimentCreate) -> ExperimentConfig:
         """Create a new experiment configuration with optional schema validation."""
+        # Validate name uniqueness within project scope
+        await self._validate_name_unique(name=data.name, project_id=data.project_id)
+
         # Validate config against schema if schema_id is provided
         if data.schema_id is not None:
             await self._validate_config_against_schema(data.schema_id, data.config)
@@ -108,6 +111,14 @@ class ExperimentService:
             )
 
         update_data = updates.model_dump(exclude_unset=True)
+
+        # Validate name uniqueness if name is being changed
+        if "name" in update_data and update_data["name"] != experiment.name:
+            await self._validate_name_unique(
+                name=update_data["name"],
+                project_id=experiment.project_id,
+                exclude_id=experiment_id,
+            )
 
         # Map API field names to DB field names
         if "config" in update_data:
@@ -169,6 +180,61 @@ class ExperimentService:
             )
 
         return diff_configs(base.config_json or {}, other.config_json or {})
+
+    async def check_name_available(
+        self,
+        name: str,
+        project_id: int | None = None,
+        exclude_id: int | None = None,
+    ) -> tuple[bool, str | None]:
+        """Check if an experiment name is available within a project scope.
+
+        Returns (available, suggestion) where suggestion is an alternative name
+        if the name is taken.
+        """
+        import re
+
+        query = select(ExperimentConfig).where(ExperimentConfig.name == name)
+        if project_id is not None:
+            query = query.where(ExperimentConfig.project_id == project_id)
+        if exclude_id is not None:
+            query = query.where(ExperimentConfig.id != exclude_id)
+        result = await self.session.execute(query)
+        existing = result.scalar_one_or_none()
+
+        if not existing:
+            return True, None
+
+        # Generate suggestion: strip trailing _NNN or _copy_N, then increment
+        base = re.sub(r"(_copy)?(_\d+)?$", "", name)
+        for i in range(2, 100):
+            candidate = f"{base}_{i:03d}"
+            q = select(ExperimentConfig).where(ExperimentConfig.name == candidate)
+            if project_id is not None:
+                q = q.where(ExperimentConfig.project_id == project_id)
+            r = await self.session.execute(q)
+            if not r.scalar_one_or_none():
+                return False, candidate
+
+        return False, f"{base}_new"
+
+    async def _validate_name_unique(
+        self,
+        name: str,
+        project_id: int | None = None,
+        exclude_id: int | None = None,
+    ) -> None:
+        """Raise 409 if experiment name already exists in the project scope."""
+        available, suggestion = await self.check_name_available(
+            name=name,
+            project_id=project_id,
+            exclude_id=exclude_id,
+        )
+        if not available:
+            detail = f"Experiment name '{name}' already exists"
+            if suggestion:
+                detail += f". Suggestion: '{suggestion}'"
+            raise HTTPException(status_code=409, detail=detail)
 
     async def _validate_config_against_schema(self, schema_id: int, config: dict[str, Any]) -> None:
         """Validate config keys against a ConfigSchema's required fields."""

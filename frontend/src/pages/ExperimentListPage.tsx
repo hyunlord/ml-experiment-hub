@@ -196,14 +196,9 @@ export default function ExperimentListPage() {
   }
 
   // ── Actions ───────────────────────────────────────────────────────
-  const handleClone = async (e: React.MouseEvent, id: number) => {
+  const handleClone = (e: React.MouseEvent, id: number) => {
     e.stopPropagation()
-    try {
-      const res = await client.post(`/experiments/${id}/clone`)
-      navigate(`/experiments/new?clone=${res.data.id}`)
-    } catch {
-      // Could show toast
-    }
+    navigate(`/experiments/new?clone_from=${id}`)
   }
 
   const handleStart = async (e: React.MouseEvent, id: number) => {
