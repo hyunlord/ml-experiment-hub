@@ -50,7 +50,7 @@ RUN uv sync --frozen
 
 EXPOSE 8002
 
-CMD ["uv", "run", "uvicorn", "backend.main:app", "--reload", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn backend.main:app --reload --host 0.0.0.0 --port 8002"]
 
 # ---------------------------------------------------------------------------
 # Stage: prod - Production with gunicorn + uvicorn workers
@@ -70,10 +70,4 @@ RUN uv sync --frozen --no-dev && uv pip install gunicorn
 EXPOSE 8002
 
 # gunicorn with uvicorn workers for async support
-CMD ["uv", "run", "gunicorn", "backend.main:app", \
-     "--bind", "0.0.0.0:8002", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--workers", "2", \
-     "--timeout", "300", \
-     "--graceful-timeout", "30", \
-     "--access-logfile", "-"]
+CMD ["sh", "-c", "uv run alembic upgrade head && uv run gunicorn backend.main:app --bind 0.0.0.0:8002 --worker-class uvicorn.workers.UvicornWorker --workers 2 --timeout 300 --graceful-timeout 30 --access-logfile -"]
