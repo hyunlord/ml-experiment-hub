@@ -1,12 +1,16 @@
 """REST API endpoints for project management."""
 
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import settings
 from backend.models.database import get_session
 from backend.schemas.project import (
+    CloneRequest,
+    CloneStatusResponse,
     ConfigContentResponse,
     GitInfoResponse,
     ProjectCreate,
@@ -15,7 +19,9 @@ from backend.schemas.project import (
     ProjectUpdate,
     ScanRequest,
     ScanResponse,
+    UploadResponse,
 )
+from backend.services.clone_service import get_clone_status, start_clone
 from backend.services.project_service import (
     ProjectService,
     get_git_info,
@@ -107,6 +113,94 @@ async def scan_project_directory(
     return scan_directory(body.path)
 
 
+@router.post("/upload", response_model=UploadResponse)
+async def upload_project_files(
+    files: list[UploadFile] = File(...),
+    project_name: str = Query(default="uploaded_project"),
+) -> UploadResponse:
+    """Upload project files (train scripts, configs) to the server."""
+    import hashlib
+    from datetime import datetime as dt
+
+    short_hash = hashlib.sha256(f"{project_name}:{dt.utcnow().isoformat()}".encode()).hexdigest()[
+        :8
+    ]
+    target_dir = Path(settings.PROJECTS_STORE_DIR) / f"{project_name}_{short_hash}"
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files: list[str] = []
+    for f in files:
+        if not f.filename:
+            continue
+        # Security: prevent path traversal
+        safe_name = Path(f.filename).name
+        dest = target_dir / safe_name
+        content = await f.read()
+        dest.write_bytes(content)
+        saved_files.append(safe_name)
+
+    # Auto-scan the uploaded directory
+    scan_result = scan_directory(str(target_dir))
+
+    return UploadResponse(
+        local_path=str(target_dir),
+        files_saved=saved_files,
+        scan_result=scan_result,
+    )
+
+
+@router.post("/clone", response_model=CloneStatusResponse)
+async def clone_repository(
+    body: CloneRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> CloneStatusResponse:
+    """Clone a GitHub repository and scan it."""
+    # If token_id provided, fetch the token
+    token: str | None = None
+    if body.token_id:
+        from backend.models.experiment import GitCredential
+        from sqlmodel import select
+
+        result = await session.execute(
+            select(GitCredential).where(GitCredential.id == body.token_id)
+        )
+        cred = result.scalar_one_or_none()
+        if not cred:
+            raise HTTPException(status_code=404, detail="Git credential not found")
+        token = cred.token
+
+    job_id = await start_clone(
+        git_url=body.git_url,
+        branch=body.branch,
+        token=token,
+        subdirectory=body.subdirectory,
+    )
+    return CloneStatusResponse(job_id=job_id, status="started")
+
+
+@router.get("/clone/{job_id}", response_model=CloneStatusResponse)
+async def get_clone_job_status(job_id: str) -> CloneStatusResponse:
+    """Get the status of a clone job."""
+    status = get_clone_status(job_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="Clone job not found")
+
+    scan_result = None
+    if status.get("scan_result"):
+        from backend.schemas.project import ScanResponse
+
+        scan_result = ScanResponse(**status["scan_result"])
+
+    return CloneStatusResponse(
+        job_id=job_id,
+        status=status["status"],
+        progress=status.get("progress"),
+        local_path=status.get("local_path"),
+        scan_result=scan_result,
+        error=status.get("error"),
+    )
+
+
 @router.post("/{project_id}/rescan", response_model=ProjectResponse)
 async def rescan_project(
     project_id: int,
@@ -119,6 +213,47 @@ async def rescan_project(
         raise HTTPException(status_code=404, detail="Project not found")
     exp_count = await service.count_experiments_for_project(project_id)
     return ProjectResponse.from_model(project, experiment_count=exp_count)
+
+
+@router.post("/{project_id}/pull")
+async def pull_project(
+    project_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> dict[str, str]:
+    """Run git pull on a GitHub-sourced project."""
+    import asyncio
+
+    service = ProjectService(session)
+    project = await service.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.source_type != "github":
+        raise HTTPException(status_code=400, detail="Git pull only available for GitHub projects")
+
+    project_path = Path(project.path)
+    if not (project_path / ".git").is_dir():
+        raise HTTPException(status_code=400, detail="Not a git repository")
+
+    process = await asyncio.create_subprocess_exec(
+        "git",
+        "pull",
+        "--ff-only",
+        cwd=str(project_path),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await process.communicate()
+
+    if process.returncode != 0:
+        raise HTTPException(
+            status_code=500,
+            detail=f"git pull failed: {stderr.decode(errors='replace').strip()}",
+        )
+
+    # Rescan after pull
+    await service.rescan_project(project_id)
+
+    return {"status": "ok", "output": stdout.decode(errors="replace").strip()}
 
 
 @router.get("/{project_id}/git", response_model=GitInfoResponse)

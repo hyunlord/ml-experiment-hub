@@ -15,6 +15,10 @@ import {
   FlaskConical,
   Plus,
   Edit,
+  Upload,
+  FolderOpen,
+  Shapes,
+  Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -23,6 +27,7 @@ import {
   getConfigContent,
   rescanProject,
   deleteProject,
+  pullProject,
 } from '@/api/projects'
 import type { Project, GitInfo, ConfigContent } from '@/types/project'
 import { ProjectStatus } from '@/types/project'
@@ -36,6 +41,8 @@ export default function ProjectDetailPage() {
   const [loading, setLoading] = useState(true)
   const [gitLoading, setGitLoading] = useState(false)
   const [rescanning, setRescanning] = useState(false)
+  const [pulling, setPulling] = useState(false)
+  const [pullSuccess, setPullSuccess] = useState(false)
 
   // Expanded config content
   const [expandedConfig, setExpandedConfig] = useState<Record<string, ConfigContent>>({})
@@ -103,6 +110,23 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handlePull = async () => {
+    if (!id) return
+    setPulling(true)
+    setPullSuccess(false)
+    try {
+      await pullProject(id)
+      setPullSuccess(true)
+      setTimeout(() => setPullSuccess(false), 3000)
+      await fetchProject()
+      await fetchGitInfo()
+    } catch (error) {
+      console.error('Failed to pull project:', error)
+    } finally {
+      setPulling(false)
+    }
+  }
+
   const toggleConfigContent = async (configPath: string) => {
     if (!id) return
 
@@ -146,12 +170,23 @@ export default function ProjectDetailPage() {
 
   const statusConfig: Record<ProjectStatus, { label: string; classes: string }> = {
     [ProjectStatus.REGISTERED]: { label: 'Registered', classes: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    [ProjectStatus.CLONING]: { label: 'Cloning', classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
     [ProjectStatus.SCANNING]: { label: 'Scanning', classes: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30' },
     [ProjectStatus.READY]: { label: 'Ready', classes: 'bg-green-500/20 text-green-300 border-green-500/30' },
     [ProjectStatus.ERROR]: { label: 'Error', classes: 'bg-red-500/20 text-red-300 border-red-500/30' },
   }
 
   const status = statusConfig[project.status] || statusConfig[ProjectStatus.REGISTERED]
+
+  // Source type badge configuration
+  const sourceTypeConfig: Record<string, { icon: typeof GitBranch; label: string; classes: string }> = {
+    github: { icon: GitBranch, label: 'GitHub', classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+    local: { icon: FolderOpen, label: 'Local', classes: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
+    template: { icon: Shapes, label: 'Template', classes: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30' },
+    upload: { icon: Upload, label: 'Upload', classes: 'bg-orange-500/20 text-orange-300 border-orange-500/30' },
+  }
+
+  const sourceType = project.source_type ? sourceTypeConfig[project.source_type] : null
 
   return (
     <div>
@@ -164,6 +199,12 @@ export default function ProjectDetailPage() {
               <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase', status.classes)}>
                 {status.label}
               </span>
+              {sourceType && (
+                <span className={cn('inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase', sourceType.classes)}>
+                  <sourceType.icon className="h-3 w-3" />
+                  {sourceType.label}
+                </span>
+              )}
               <span className="inline-flex items-center rounded-full border border-input bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
                 {project.project_type}
               </span>
@@ -196,6 +237,16 @@ export default function ProjectDetailPage() {
                   {project.git_url}
                   <ExternalLink className="h-3 w-3" />
                 </a>
+                {project.git_branch && (
+                  <span className="ml-2 rounded bg-secondary px-2 py-0.5 text-xs font-mono text-secondary-foreground">
+                    {project.git_branch}
+                  </span>
+                )}
+              </div>
+            )}
+            {pullSuccess && (
+              <div className="mt-2 text-sm text-green-500">
+                ✓ Successfully pulled latest changes
               </div>
             )}
           </div>
@@ -209,6 +260,16 @@ export default function ProjectDetailPage() {
             <Edit className="h-4 w-4" />
             Edit
           </button>
+          {project.source_type === 'github' && (
+            <button
+              onClick={handlePull}
+              disabled={pulling}
+              className="flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <Download className={cn('h-4 w-4', pulling && 'animate-pulse')} />
+              Pull Latest
+            </button>
+          )}
           <button
             onClick={handleRescan}
             disabled={rescanning}
@@ -270,6 +331,33 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Template Info - only show if source_type is template */}
+        {project.source_type === 'template' && (project.template_type || project.template_task || project.template_model) && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h3 className="mb-2 text-sm font-medium text-muted-foreground">Template Info</h3>
+            <div className="space-y-1 text-xs">
+              {project.template_type && (
+                <div>
+                  <span className="text-muted-foreground">Type: </span>
+                  <span className="text-card-foreground">{project.template_type}</span>
+                </div>
+              )}
+              {project.template_task && (
+                <div>
+                  <span className="text-muted-foreground">Task: </span>
+                  <span className="text-card-foreground">{project.template_task}</span>
+                </div>
+              )}
+              {project.template_model && (
+                <div>
+                  <span className="text-muted-foreground">Model: </span>
+                  <span className="text-card-foreground">{project.template_model}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Detected Config Files */}

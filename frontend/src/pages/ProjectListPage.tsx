@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderGit2, Plus, Tag, Clock, FlaskConical } from 'lucide-react'
+import { FolderGit2, Plus, Tag, Clock, FlaskConical, GitBranch, FolderOpen, Shapes, Upload } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getProjects } from '@/api/projects'
 import type { Project, ProjectStatus } from '@/types/project'
@@ -12,8 +12,16 @@ import type { Project, ProjectStatus } from '@/types/project'
 const STATUS_CONFIG: Record<ProjectStatus, { label: string; classes: string }> = {
   ready: { label: 'Ready', classes: 'bg-green-500/10 text-green-500 border-green-500/20' },
   registered: { label: 'Registered', classes: 'bg-blue-500/10 text-blue-500 border-blue-500/20' },
+  cloning: { label: 'Cloning', classes: 'bg-purple-500/10 text-purple-500 border-purple-500/20' },
   scanning: { label: 'Scanning', classes: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' },
   error: { label: 'Error', classes: 'bg-red-500/10 text-red-500 border-red-500/20' },
+}
+
+const SOURCE_TYPE_CONFIG: Record<string, { icon: typeof GitBranch; classes: string }> = {
+  github: { icon: GitBranch, classes: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+  local: { icon: FolderOpen, classes: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+  template: { icon: Shapes, classes: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
+  upload: { icon: Upload, classes: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
 }
 
 // ---------------------------------------------------------------------------
@@ -106,10 +114,14 @@ export default function ProjectListPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => {
             const statusCfg = STATUS_CONFIG[project.status] || STATUS_CONFIG.registered
+            const sourceTypeCfg = project.source_type ? SOURCE_TYPE_CONFIG[project.source_type] : null
             const truncatedPath =
               project.path.length > 50
                 ? '...' + project.path.slice(-47)
                 : project.path
+            const truncatedGitUrl = project.git_url && project.git_url.length > 40
+              ? project.git_url.slice(0, 37) + '...'
+              : project.git_url
 
             return (
               <div
@@ -129,6 +141,14 @@ export default function ProjectListPage() {
                     >
                       {truncatedPath}
                     </p>
+                    {project.git_url && (
+                      <p
+                        className="mt-1 text-xs text-muted-foreground/70"
+                        title={project.git_url}
+                      >
+                        {truncatedGitUrl}
+                      </p>
+                    )}
                   </div>
                   <FolderGit2 className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary/50" />
                 </div>
@@ -144,6 +164,18 @@ export default function ProjectListPage() {
                   >
                     {statusCfg.label}
                   </span>
+
+                  {/* Source Type */}
+                  {sourceTypeCfg && (
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium',
+                        sourceTypeCfg.classes,
+                      )}
+                    >
+                      <sourceTypeCfg.icon className="h-3 w-3" />
+                    </span>
+                  )}
 
                   {/* Project Type */}
                   <span className="inline-flex items-center rounded-md border border-border bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
