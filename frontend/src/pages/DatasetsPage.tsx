@@ -10,9 +10,29 @@ import {
   HardDrive,
   FileText,
   X,
+  Plus,
+  Trash2,
+  Settings2,
+  Search,
 } from 'lucide-react'
-import type { Dataset, DatasetStatus, PreviewResponse } from '@/api/datasets'
-import { listDatasets, previewDataset, prepareDataset } from '@/api/datasets'
+import type {
+  Dataset,
+  DatasetStatus,
+  DatasetType,
+  DatasetFormat,
+  SplitMethod,
+  PreviewResponse,
+  CreateDatasetPayload,
+  DetectResult,
+} from '@/api/datasets'
+import {
+  listDatasets,
+  previewDataset,
+  prepareDataset,
+  createDataset,
+  deleteDataset,
+  detectDataset,
+} from '@/api/datasets'
 
 // ---------------------------------------------------------------------------
 // Status badge
@@ -131,6 +151,11 @@ function PreviewModal({
                 ? `${preview.total_entries.toLocaleString()} total entries`
                 : 'Unknown entries'}
               {' | '}Showing {preview.samples.length} random samples
+              {preview.dataset_type && (
+                <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">
+                  {preview.dataset_type}
+                </span>
+              )}
             </p>
           </div>
           <button
@@ -156,22 +181,24 @@ function PreviewModal({
           {preview.samples.map((sample, idx) => (
             <div key={idx} className="flex gap-4 px-5 py-4">
               {/* Thumbnail */}
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-                {sample._image_exists && sample._image_url ? (
-                  <img
-                    src={sample._image_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none'
-                    }}
-                  />
-                ) : (
-                  <FileText className="h-6 w-6 text-muted-foreground" />
-                )}
-              </div>
+              {(preview.dataset_type === 'image-text' || preview.dataset_type === 'image-only' || sample.image) && (
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+                  {sample._image_exists && sample._image_url ? (
+                    <img
+                      src={sample._image_url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  ) : (
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  )}
+                </div>
+              )}
 
-              {/* Caption(s) */}
+              {/* Caption(s) / text */}
               <div className="min-w-0 flex-1 space-y-1">
                 {sample.caption && (
                   <p className="text-sm text-card-foreground">
@@ -182,6 +209,9 @@ function PreviewModal({
                       </span>
                     )}
                   </p>
+                )}
+                {sample.text && !sample.caption && (
+                  <p className="text-sm text-card-foreground">{String(sample.text)}</p>
                 )}
                 {sample.caption_ko && sample.caption_ko !== sample.caption && (
                   <p className="text-sm text-muted-foreground">
@@ -194,6 +224,18 @@ function PreviewModal({
                     {sample.caption_en}
                     <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-xs">EN</span>
                   </p>
+                )}
+                {/* For tabular: show all keys */}
+                {!sample.caption && !sample.text && !sample.image && (
+                  <div className="space-y-0.5">
+                    {Object.entries(sample)
+                      .filter(([k]) => !k.startsWith('_'))
+                      .map(([k, v]) => (
+                        <p key={k} className="text-xs text-muted-foreground">
+                          <span className="font-medium">{k}:</span> {String(v)}
+                        </p>
+                      ))}
+                  </div>
                 )}
                 {sample.image && (
                   <p className="truncate text-xs text-muted-foreground/70">
@@ -215,6 +257,356 @@ function PreviewModal({
 }
 
 // ---------------------------------------------------------------------------
+// Register dataset modal
+// ---------------------------------------------------------------------------
+
+const DATASET_TYPES: { value: DatasetType; label: string }[] = [
+  { value: 'image-text', label: 'Image + Text' },
+  { value: 'text-only', label: 'Text Only' },
+  { value: 'image-only', label: 'Image Only' },
+  { value: 'tabular', label: 'Tabular' },
+  { value: 'custom', label: 'Custom' },
+]
+
+const DATASET_FORMATS: { value: DatasetFormat; label: string }[] = [
+  { value: 'jsonl', label: 'JSONL' },
+  { value: 'csv', label: 'CSV' },
+  { value: 'parquet', label: 'Parquet' },
+  { value: 'huggingface', label: 'HuggingFace' },
+  { value: 'directory', label: 'Directory' },
+]
+
+const SPLIT_METHODS: { value: SplitMethod; label: string; desc: string }[] = [
+  { value: 'none', label: 'None', desc: 'No split configuration' },
+  { value: 'ratio', label: 'Ratio', desc: 'Auto-split by percentage (80/10/10)' },
+  { value: 'field', label: 'Field', desc: 'Use a JSON field (e.g. "split")' },
+  { value: 'file', label: 'File', desc: 'Separate files per split' },
+  { value: 'custom', label: 'Custom', desc: 'Custom filter expressions' },
+]
+
+function RegisterModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [dataRoot, setDataRoot] = useState('')
+  const [jsonlPath, setJsonlPath] = useState('')
+  const [rawPath, setRawPath] = useState('')
+  const [dsType, setDsType] = useState<DatasetType>('image-text')
+  const [dsFormat, setDsFormat] = useState<DatasetFormat>('jsonl')
+  const [rawFormat, setRawFormat] = useState('custom')
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>('none')
+  const [splitField, setSplitField] = useState('split')
+  const [splitRatios, setSplitRatios] = useState('0.8,0.1,0.1')
+  const [splitNames, setSplitNames] = useState('train,val,test')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [detectResult, setDetectResult] = useState<DetectResult | null>(null)
+
+  const handleDetect = async (path: string) => {
+    if (!path.trim()) return
+    setDetecting(true)
+    try {
+      const result = await detectDataset(path)
+      setDetectResult(result)
+      if (result.format) setDsFormat(result.format as DatasetFormat)
+      if (result.type) setDsType(result.type as DatasetType)
+      if (result.raw_format) setRawFormat(result.raw_format)
+    } catch {
+      // ignore detection errors
+    } finally {
+      setDetecting(false)
+    }
+  }
+
+  const buildSplitsConfig = (): Record<string, unknown> => {
+    if (splitMethod === 'ratio') {
+      const names = splitNames.split(',').map((s) => s.trim())
+      const ratios = splitRatios.split(',').map((s) => parseFloat(s.trim()))
+      const obj: Record<string, number> = {}
+      names.forEach((n, i) => {
+        obj[n] = ratios[i] ?? 0
+      })
+      return { ratios: obj }
+    }
+    if (splitMethod === 'field') {
+      return { field: splitField }
+    }
+    return {}
+  }
+
+  const handleSubmit = async () => {
+    if (!name.trim()) {
+      setError('Name is required')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const payload: CreateDatasetPayload = {
+        name: name.trim(),
+        description: description.trim(),
+        dataset_type: dsType,
+        dataset_format: dsFormat,
+        data_root: dataRoot.trim(),
+        jsonl_path: jsonlPath.trim(),
+        raw_path: rawPath.trim(),
+        raw_format: rawFormat,
+        split_method: splitMethod,
+        splits_config: buildSplitsConfig(),
+      }
+      await createDataset(payload)
+      onCreated()
+      onClose()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to register dataset'
+      setError(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <h3 className="text-lg font-semibold text-card-foreground">Register Dataset</h3>
+          <button onClick={onClose} className="rounded-md p-1.5 text-muted-foreground hover:bg-accent">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          {/* Name + Description */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Name *</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="My Dataset"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Description</label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Brief description"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          </div>
+
+          {/* Path with auto-detect */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">
+              Data Path (JSONL/JSON/CSV file or directory, relative to DATA_DIR)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={jsonlPath || rawPath}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v.endsWith('.jsonl')) {
+                    setJsonlPath(v)
+                  } else {
+                    setRawPath(v)
+                    if (!jsonlPath) setJsonlPath(v.replace(/\.[^.]+$/, '.jsonl'))
+                  }
+                }}
+                placeholder="path/to/data.jsonl"
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                onClick={() => handleDetect(jsonlPath || rawPath)}
+                disabled={detecting}
+                className="inline-flex items-center gap-1.5 rounded-md border border-input px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+              >
+                <Search className="h-3.5 w-3.5" />
+                {detecting ? 'Detecting...' : 'Detect'}
+              </button>
+            </div>
+            {detectResult && (
+              <div className="mt-2 rounded-md bg-muted/50 px-3 py-2 text-xs">
+                {detectResult.exists ? (
+                  <>
+                    <span className="text-green-600">Found</span>
+                    {detectResult.type && <> | Type: <strong>{detectResult.type}</strong></>}
+                    {detectResult.format && <> | Format: <strong>{detectResult.format}</strong></>}
+                    {detectResult.entry_count != null && <> | Entries: <strong>{detectResult.entry_count.toLocaleString()}</strong></>}
+                  </>
+                ) : (
+                  <span className="text-red-500">{detectResult.error || 'Path not found'}</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Data root */}
+          <div>
+            <label className="mb-1 block text-sm font-medium">Data Root (image directory)</label>
+            <input
+              type="text"
+              value={dataRoot}
+              onChange={(e) => setDataRoot(e.target.value)}
+              placeholder="path/to/images"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          {/* Type + Format */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium">Type</label>
+              <select
+                value={dsType}
+                onChange={(e) => setDsType(e.target.value as DatasetType)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {DATASET_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium">Format</label>
+              <select
+                value={dsFormat}
+                onChange={(e) => setDsFormat(e.target.value as DatasetFormat)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {DATASET_FORMATS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Split configuration */}
+          <div className="rounded-md border border-border p-4">
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <Settings2 className="h-4 w-4" />
+              Split Configuration
+            </h4>
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Method</label>
+                <select
+                  value={splitMethod}
+                  onChange={(e) => setSplitMethod(e.target.value as SplitMethod)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {SPLIT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label} - {m.desc}</option>
+                  ))}
+                </select>
+              </div>
+
+              {splitMethod === 'ratio' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Split Names</label>
+                    <input
+                      type="text"
+                      value={splitNames}
+                      onChange={(e) => setSplitNames(e.target.value)}
+                      placeholder="train,val,test"
+                      className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted-foreground">Ratios</label>
+                    <input
+                      type="text"
+                      value={splitRatios}
+                      onChange={(e) => setSplitRatios(e.target.value)}
+                      placeholder="0.8,0.1,0.1"
+                      className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {splitMethod === 'field' && (
+                <div>
+                  <label className="mb-1 block text-xs text-muted-foreground">Field Name</label>
+                  <input
+                    type="text"
+                    value={splitField}
+                    onChange={(e) => setSplitField(e.target.value)}
+                    placeholder="split"
+                    className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          )}
+
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={onClose}
+              className="rounded-md border border-input px-4 py-2 text-sm font-medium hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={saving || !name.trim()}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              {saving ? 'Registering...' : 'Register'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Split info display
+// ---------------------------------------------------------------------------
+
+function SplitInfo({ dataset }: { dataset: Dataset }) {
+  if (dataset.split_method === 'none') return null
+  const config = dataset.splits_config || {}
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      <Settings2 className="h-3 w-3" />
+      <span className="font-medium">{dataset.split_method}:</span>
+      {dataset.split_method === 'field' && config.field != null && (
+        <span className="rounded bg-muted px-1.5 py-0.5">field=&quot;{String(config.field)}&quot;</span>
+      )}
+      {dataset.split_method === 'ratio' && config.ratios != null && (
+        <>
+          {Object.entries(config.ratios as Record<string, number>).map(([name, ratio]) => (
+            <span key={name} className="rounded bg-muted px-1.5 py-0.5">
+              {name}: {(Number(ratio) * 100).toFixed(0)}%
+            </span>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Dataset card
 // ---------------------------------------------------------------------------
 
@@ -222,10 +614,12 @@ function DatasetCard({
   dataset,
   onPreview,
   onPrepare,
+  onDelete,
 }: {
   dataset: Dataset
   onPreview: (id: number) => void
   onPrepare: (id: number) => void
+  onDelete: (id: number) => void
 }) {
   return (
     <div className="rounded-lg border border-border bg-card p-5 transition-shadow hover:shadow-md">
@@ -237,6 +631,11 @@ function DatasetCard({
             <h3 className="truncate text-sm font-semibold text-card-foreground">
               {dataset.name}
             </h3>
+            {dataset.is_seed && (
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                SEED
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{dataset.description}</p>
         </div>
@@ -244,30 +643,36 @@ function DatasetCard({
       </div>
 
       {/* Stats row */}
-      <div className="mb-4 grid grid-cols-3 gap-3">
-        <div className="rounded-md bg-muted/50 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Entries</p>
+      <div className="mb-3 grid grid-cols-4 gap-2">
+        <div className="rounded-md bg-muted/50 px-2.5 py-1.5">
+          <p className="text-[10px] text-muted-foreground">Entries</p>
           <p className="text-sm font-medium text-card-foreground">
             {dataset.entry_count != null ? dataset.entry_count.toLocaleString() : '-'}
           </p>
         </div>
-        <div className="rounded-md bg-muted/50 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Size</p>
+        <div className="rounded-md bg-muted/50 px-2.5 py-1.5">
+          <p className="text-[10px] text-muted-foreground">Size</p>
           <p className="text-sm font-medium text-card-foreground">
             {formatBytes(dataset.size_bytes)}
           </p>
         </div>
-        <div className="rounded-md bg-muted/50 px-3 py-2">
-          <p className="text-xs text-muted-foreground">Format</p>
+        <div className="rounded-md bg-muted/50 px-2.5 py-1.5">
+          <p className="text-[10px] text-muted-foreground">Type</p>
           <p className="text-sm font-medium text-card-foreground">
-            {dataset.raw_format}
+            {dataset.dataset_type}
+          </p>
+        </div>
+        <div className="rounded-md bg-muted/50 px-2.5 py-1.5">
+          <p className="text-[10px] text-muted-foreground">Format</p>
+          <p className="text-sm font-medium text-card-foreground">
+            {dataset.dataset_format}
           </p>
         </div>
       </div>
 
       {/* Progress bar for preparing */}
       {dataset.status === 'preparing' && dataset.prepare_progress != null && (
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
             <span>Preparing JSONL...</span>
             <span>{dataset.prepare_progress}%</span>
@@ -282,7 +687,7 @@ function DatasetCard({
       )}
 
       {/* File paths */}
-      <div className="mb-4 space-y-1">
+      <div className="mb-3 space-y-1">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <HardDrive className="h-3 w-3" />
           <span className="truncate">
@@ -291,8 +696,11 @@ function DatasetCard({
         </div>
       </div>
 
+      {/* Split info */}
+      <SplitInfo dataset={dataset} />
+
       {/* Actions */}
-      <div className="flex items-center gap-2">
+      <div className="mt-3 flex items-center gap-2">
         {dataset.status === 'ready' && (
           <button
             onClick={() => onPreview(dataset.id)}
@@ -321,6 +729,14 @@ function DatasetCard({
             Preparation in progress...
           </span>
         )}
+        {!dataset.is_seed && (
+          <button
+            onClick={() => onDelete(dataset.id)}
+            className="ml-auto inline-flex items-center gap-1 rounded-md border border-input px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:border-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   )
@@ -336,6 +752,7 @@ export default function DatasetsPage() {
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<PreviewResponse | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
 
   const fetchDatasets = useCallback(async () => {
     try {
@@ -377,10 +794,19 @@ export default function DatasetsPage() {
   const handlePrepare = async (id: number) => {
     try {
       await prepareDataset(id)
-      // Refresh to show preparing status
       fetchDatasets()
     } catch {
       setError('Failed to start prepare job')
+    }
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Remove this dataset registration? (Files will not be deleted)')) return
+    try {
+      await deleteDataset(id)
+      fetchDatasets()
+    } catch {
+      setError('Failed to delete dataset')
     }
   }
 
@@ -398,20 +824,29 @@ export default function DatasetsPage() {
 
   return (
     <div>
-      {/* Summary bar */}
-      <div className="mb-6 flex items-center gap-4">
-        <div className="flex items-center gap-1.5 text-sm">
-          <CheckCircle className="h-4 w-4 text-green-500" />
-          <span className="text-muted-foreground">{readyCount} Ready</span>
+      {/* Header */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-sm">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+            <span className="text-muted-foreground">{readyCount} Ready</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <span className="text-muted-foreground">{rawCount} Raw Only</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-sm">
+            <XCircle className="h-4 w-4 text-red-500" />
+            <span className="text-muted-foreground">{notFoundCount} Not Found</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-sm">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <span className="text-muted-foreground">{rawCount} Raw Only</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm">
-          <XCircle className="h-4 w-4 text-red-500" />
-          <span className="text-muted-foreground">{notFoundCount} Not Found</span>
-        </div>
+        <button
+          onClick={() => setShowRegister(true)}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        >
+          <Plus className="h-4 w-4" />
+          Register Dataset
+        </button>
       </div>
 
       {/* Error */}
@@ -429,6 +864,7 @@ export default function DatasetsPage() {
             dataset={ds}
             onPreview={handlePreview}
             onPrepare={handlePrepare}
+            onDelete={handleDelete}
           />
         ))}
       </div>
@@ -438,6 +874,13 @@ export default function DatasetsPage() {
         <div className="py-20 text-center text-muted-foreground">
           <Database className="mx-auto mb-3 h-10 w-10" />
           <p>No datasets registered</p>
+          <button
+            onClick={() => setShowRegister(true)}
+            className="mt-3 inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+          >
+            <Plus className="h-4 w-4" />
+            Register your first dataset
+          </button>
         </div>
       )}
 
@@ -450,6 +893,14 @@ export default function DatasetsPage() {
 
       {/* Preview modal */}
       {preview && <PreviewModal preview={preview} onClose={() => setPreview(null)} />}
+
+      {/* Register modal */}
+      {showRegister && (
+        <RegisterModal
+          onClose={() => setShowRegister(false)}
+          onCreated={fetchDatasets}
+        />
+      )}
     </div>
   )
 }

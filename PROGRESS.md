@@ -1,3 +1,92 @@
+# Milestone 6 Progress
+
+## Status: COMPLETE
+
+## Completion Criteria
+
+### Dataset Registration
+- [x] "Register Dataset" button on /datasets page
+- [x] Input: name, path, format (jsonl/csv/parquet/huggingface/directory), type (image-text/text-only/image-only/tabular/custom)
+- [x] Auto-detect: path input → infer format/type/entry count
+- [x] Status display: Ready / Raw Only / Not Found / Preparing
+- [x] Status computed from file system checks on server
+
+### Split Settings
+- [x] Ratio preset: train 80% / val 10% / test 10%
+- [x] File-based split: separate files per split
+- [x] Field-based split: JSON field value (Karpathy style)
+- [x] Custom splits: user-defined split names and filters
+- [x] Split preview: per-split sample counts
+
+### Data Preparation
+- [x] Prepare button on raw-only datasets (pre-existing from M5)
+- [x] Progress tracking via job system (pre-existing)
+- [x] Adapter prepare logic (coco_karpathy, jsonl_copy workers)
+
+### Preview
+- [x] Dataset click → random 5 samples with auto-rendering
+- [x] image-text: thumbnail + caption; text-only: text; tabular: key-value
+- [x] Basic stats: entry count, size, language distribution
+
+### Experiment Form Integration
+- [x] Dataset selector in experiment creation form
+- [x] Ready datasets selectable with checkbox (multi-select)
+- [x] Unavailable datasets shown but disabled with status badge
+- [x] Selected dataset IDs included in experiment config
+
+### Platform Genericity
+- [x] No vlm/siglip/hash terms in core API or shared schemas
+- [x] gate.sh PASS (231 tests, 1 skipped, smoke OK)
+
+## Changes Summary
+
+### Shared — New Enums
+- **shared/schemas.py**: Added DatasetType (image-text/text-only/image-only/tabular/custom),
+  DatasetFormat (jsonl/csv/parquet/huggingface/directory),
+  SplitMethod (ratio/file/field/custom/none)
+
+### Backend — Model Expansion
+- **models/experiment.py**: Expanded DatasetDefinition with dataset_type, dataset_format,
+  split_method, splits_config (JSON), is_seed fields
+
+### Backend — Dataset Registry Service
+- **services/dataset_registry.py**: Updated SEED_DATASETS with new fields (type, format,
+  split_method, splits_config, is_seed=True); added detect_dataset() with sub-detectors
+  for directory/jsonl/json/csv; added compute_split_preview() for ratio/field/file/custom/none;
+  added _count_jsonl_lines() and _count_by_field() helpers
+
+### Backend — Dataset API
+- **api/datasets.py**: Full CRUD — POST /api/datasets (register), PUT /api/datasets/{id}
+  (update), DELETE /api/datasets/{id}; POST /api/datasets/detect (auto-detect from path);
+  PUT /api/datasets/{id}/splits (update split config); GET /api/datasets/{id}/splits/preview
+  (per-split counts); added CreateDatasetRequest, UpdateDatasetRequest, DetectRequest/Response,
+  SplitUpdateRequest/PreviewResponse schemas; added _slugify() helper; duplicate key detection
+
+### Frontend — API Client
+- **api/datasets.ts**: Added DatasetType, DatasetFormat, SplitMethod types; updated Dataset
+  interface with new fields; added createDataset, updateDataset, deleteDataset, detectDataset,
+  updateSplits, previewSplits functions; added payload interfaces
+
+### Frontend — Datasets Page
+- **pages/DatasetsPage.tsx**: RegisterModal with auto-detect button, type/format selectors,
+  split configuration (ratio/field/custom); SplitInfo component on cards; updated DatasetCard
+  with 4-column stats (entries, size, type, format), SEED badge, delete button; updated
+  PreviewModal with dataset_type-aware rendering
+
+### Frontend — Experiment Create Page
+- **pages/ExperimentCreatePage.tsx**: Added dataset selector section with checkbox multi-select;
+  ready datasets selectable, unavailable datasets shown disabled with status badges;
+  selected dataset_ids included in experiment config payload
+
+### Tests
+- **test_milestone6.py**: Added 19 new tests (sections 13-19): DatasetType/DatasetFormat/
+  SplitMethod enum values, model creation with new fields, auto-detect (jsonl/csv/directory/
+  json/missing), split preview (ratio/field/none), CRUD request/response schemas, _slugify,
+  seed data new fields, genericity checks (no vlm terms in API or schemas)
+- 231 tests pass total, 1 skipped, gate.sh PASS
+
+---
+
 # Milestone 5 Progress
 
 ## Status: COMPLETE
