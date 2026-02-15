@@ -1,7 +1,7 @@
 # =============================================================================
-# ML Experiment Hub - Production Docker Compose
-# Target: DGX Spark (Ubuntu + NVIDIA GPU)
-# Usage: docker compose up -d
+# ML Experiment Hub - Docker Compose
+# Usage: docker compose up -d --build
+# That's it. No scripts needed.
 # =============================================================================
 
 services:
@@ -14,14 +14,16 @@ services:
     ports:
       - "8002:8002"
     volumes:
-      - ./data:/data                              # DB (./data/ml_hub.db) + logs (persistent)
-      - ${PROJECTS_DIR:-./_projects}:/projects:ro  # ML project code (read-only)
-      - ${DATA_DIR:-./_data}:/ml-data:ro           # Training data (COCO etc, read-only)
+      - ./data:/data                              # DB + logs (persistent on host)
+      - hub-projects:/app/projects                # Cloned/uploaded projects (Docker volume)
+      - ${PROJECTS_DIR:-./_projects}:/projects:ro  # User ML project code (read-only)
+      - ${DATA_DIR:-./_data}:/ml-data:ro           # Training data (read-only)
       - ${CHECKPOINT_DIR:-./_checkpoints}:/checkpoints  # Checkpoints (read/write)
       - /tmp/ml-hub-configs:/tmp/configs           # Generated config YAMLs
-      - ml-venvs:/data/venvs                      # Per-project Python venvs (persistent)
+      - hub-venvs:/data/venvs                     # Per-project Python venvs
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////data/ml_hub.db
+      - PROJECTS_STORE_DIR=/app/projects
       - PROJECTS_DIR=/projects
       - DATA_DIR=/ml-data
       - CHECKPOINT_BASE_DIR=/checkpoints
@@ -33,7 +35,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4g           # Cap backend memory so it doesn't compete with training
+          memory: 4g
         reservations:
           devices:
             - driver: nvidia
@@ -42,9 +44,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8002/api/system/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 5
       start_period: 15s
     stop_grace_period: 30s
 
@@ -65,4 +67,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  ml-venvs:
+  hub-projects:
+  hub-venvs:

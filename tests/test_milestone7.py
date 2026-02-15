@@ -323,9 +323,9 @@ class TestDGXSparkConfig:
         assert training["batch_size"] == "auto"
         assert "bf16" in training.get("precision", "")
 
-    def test_setup_dgx_script_exists(self):
-        """scripts/setup_dgx.sh should exist and be executable."""
-        script_path = Path(__file__).parent.parent / "scripts" / "setup_dgx.sh"
+    def test_entrypoint_script_exists(self):
+        """backend/entrypoint.sh should exist and be executable."""
+        script_path = Path(__file__).parent.parent / "backend" / "entrypoint.sh"
         assert script_path.exists()
         assert os.access(script_path, os.X_OK)
 

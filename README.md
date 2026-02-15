@@ -4,6 +4,47 @@ A generic, self-hosted platform for running, monitoring, and comparing ML traini
 Any model type can be integrated via the **adapter plugin interface** — classification, retrieval,
 generation, or any custom task.
 
+## Quick Start
+
+```bash
+git clone https://github.com/hyunlord/ml-experiment-hub
+cd ml-experiment-hub
+docker compose up -d --build
+# → http://localhost:3000
+```
+
+That's it. No scripts, no `.env` file needed. Everything starts automatically:
+- Backend (FastAPI + Gunicorn) on port 8002
+- Frontend (React + Nginx) on port 3000
+- DB migrations run on first start
+- Data persists in `./data/` directory
+
+### Code Update
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+### DB Reset (migration issues or fresh start)
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```
+
+### Optional: Mount Your Data
+
+Create a `.env` file to point to your ML data directories:
+
+```bash
+PROJECTS_DIR=/home/nvidia/projects      # ML project source code (read-only)
+DATA_DIR=/home/nvidia/data              # Training data (read-only)
+CHECKPOINT_DIR=/home/nvidia/checkpoints # Checkpoint storage
+```
+
+Without `.env`, empty placeholder directories are used.
+
 ## Features
 
 - **Adapter Plugin System** — plug in any model type via `BaseAdapter` interface
@@ -51,9 +92,9 @@ ml-experiment-hub/
 │   └── pages/             # Page components (dashboard, monitor, compare, demos)
 ├── configs/               # Training presets (dgx_spark.yaml)
 ├── shared/                # Shared schemas and enums
-├── scripts/               # Setup, deploy, gate scripts
+├── scripts/               # Dev scripts (gate, setup)
 ├── tests/                 # Pytest test suite
-└── docker-compose.yml     # Production deployment
+└── docker-compose.yml     # Production deployment (one command)
 ```
 
 ## Tech Stack
@@ -66,98 +107,15 @@ ml-experiment-hub/
 | Process | subprocess + asyncio (training/eval as child processes) |
 | Deployment | Docker Compose, NVIDIA Container Toolkit |
 
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11+ and [uv](https://docs.astral.sh/uv/)
-- Node.js 18+
-- Docker + Docker Compose (for production)
-- NVIDIA GPU + drivers (optional for local dev)
-
-### Local Development
-
-```bash
-# 1. Clone and install
-git clone <repo-url> && cd ml-experiment-hub
-uv sync --all-extras
-cd frontend && npm install && cd ..
-
-# 2. Start dev servers
-# Terminal 1: Backend
-uv run uvicorn backend.main:app --reload --port 8002
-
-# Terminal 2: Frontend
-cd frontend && npm run dev
-```
-
-- Dashboard: http://localhost:5173
-- API docs: http://localhost:8002/docs
-
-### Docker (Production)
-
-```bash
-# Set data paths
-export DATA_DIR=~/data              # Training data
-export CHECKPOINT_DIR=~/checkpoints
-export PROJECTS_DIR=~/projects      # ML project source code
-
-# Build and start
-docker compose up -d --build
-
-# Dashboard: http://localhost:3000
-# API docs:  http://localhost:8002/docs
-```
-
 ## Your First Experiment
 
-1. **Open the dashboard** at http://localhost:5173 (dev) or http://localhost:3000 (Docker)
+1. **Open the dashboard** at http://localhost:3000
 2. **Create an experiment** — Experiments → New Experiment
 3. **Select framework** — choose `dummy_classifier` for a quick test
 4. **Configure** — set `{"dataset": "mnist", "epochs": 3, "learning_rate": 0.001}`
 5. **Start training** — click Start, watch live metrics on the run monitor page
 6. **Compare** — select experiments and click Compare for side-by-side analysis
 7. **Try the demo** — go to Classifier Demo, upload an image, and classify it
-
-## Deployment (DGX Spark)
-
-For NVIDIA DGX Spark (GB10 Grace-Blackwell, 128 GB unified memory).
-
-### First-time Setup
-
-```bash
-git clone <repo-url> && cd ml-experiment-hub
-cp .env.example .env   # edit paths: PROJECTS_DIR, DATA_DIR, CHECKPOINT_DIR
-./scripts/setup_dgx.sh --data-dir ~/data --checkpoint-dir ~/checkpoints
-docker compose up -d
-```
-
-### Code Update (after local changes are pushed)
-
-```bash
-./scripts/deploy.sh
-# or: make deploy
-```
-
-### Database Reset (migration issues or fresh start)
-
-```bash
-./scripts/reset-db.sh
-# or: make reset-db
-```
-
-### Monitoring
-
-```bash
-# Live backend logs
-docker compose logs backend --tail 50 -f
-# or: make logs
-
-# Service status + health
-make status
-```
-
-See `configs/dgx_spark.yaml` for the pre-tuned training preset.
 
 ## API Overview
 
@@ -188,7 +146,24 @@ Full interactive docs at `/docs` (Swagger UI) and `/redoc`.
 - **GPU temperature alerts** — warning at 85°C, critical at 95°C
 - **Docker memory limits** — backend capped at 4 GB to avoid competing with training
 
-## Development
+## Local Development
+
+```bash
+# 1. Clone and install
+git clone <repo-url> && cd ml-experiment-hub
+uv sync --all-extras
+cd frontend && npm install && cd ..
+
+# 2. Start dev servers
+# Terminal 1: Backend
+uv run uvicorn backend.main:app --reload --port 8002
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
+
+- Dashboard: http://localhost:5173
+- API docs: http://localhost:8002/docs
 
 ```bash
 # Run tests

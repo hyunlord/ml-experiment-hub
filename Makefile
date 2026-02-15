@@ -1,12 +1,19 @@
-# ML Experiment Hub - DGX Spark convenience targets
+# ML Experiment Hub
 
-.PHONY: deploy reset-db logs status health
+.PHONY: up down rebuild reset logs status health
 
-deploy:
-	./scripts/deploy.sh
+up:
+	docker compose up -d --build
 
-reset-db:
-	./scripts/reset-db.sh
+down:
+	docker compose down
+
+rebuild:
+	docker compose up -d --build --force-recreate
+
+reset:
+	docker compose down -v
+	docker compose up -d --build
 
 logs:
 	docker compose logs backend --tail 50 -f
