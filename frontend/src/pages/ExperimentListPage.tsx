@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Copy,
   ListPlus,
+  Pencil,
   Play,
   Plus,
   Search,
@@ -560,6 +561,18 @@ export default function ExperimentListPage() {
                               onClick={(e) => handleMonitor(e, exp.id)}
                             >
                               <BarChart3 className="h-4 w-4" />
+                            </ActionBtn>
+                          )}
+                          {/* Edit (draft only) */}
+                          {isDraft && (
+                            <ActionBtn
+                              title="Edit"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate(`/experiments/${exp.id}/edit`)
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
                             </ActionBtn>
                           )}
                           {/* Clone */}

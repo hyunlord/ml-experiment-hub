@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -65,7 +65,9 @@ const GROUP_ICONS: Record<string, string> = {
 
 export default function ExperimentCreatePage() {
   const navigate = useNavigate()
+  const { id: editId } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
+  const isEditMode = Boolean(editId)
 
   // ── Project & Config state ──────────────────────────────────────
   const [projects, setProjects] = useState<Project[]>([])
@@ -207,6 +209,25 @@ export default function ExperimentCreatePage() {
         .catch(() => setError('Failed to load experiment for cloning'))
     }
   }, [searchParams, projectsLoading])
+
+  // ── Load experiment for edit mode ──────────────────────────────
+  useEffect(() => {
+    if (!editId || projectsLoading) return
+    client
+      .get(`/experiments/${editId}`)
+      .then((res) => {
+        const exp = res.data
+        setName(exp.name || '')
+        setDescription(exp.description || '')
+        setTags(exp.tags || [])
+        if (exp.project_id) setSelectedProjectId(exp.project_id)
+        const flat = exp.config || {}
+        setConfig(flat)
+        setOriginalConfig(flat)
+        setDraftId(Number(editId))
+      })
+      .catch(() => setError('Failed to load experiment'))
+  }, [editId, projectsLoading])
 
   // ── Parse config when selection changes ─────────────────────────
   useEffect(() => {
@@ -399,8 +420,13 @@ export default function ExperimentCreatePage() {
     setError('')
     setSaving(true)
     try {
-      const res = await client.post('/experiments', buildPayload())
-      navigate(`/experiments/${res.data.id}`)
+      if (isEditMode && editId) {
+        await client.put(`/experiments/${editId}`, buildPayload())
+        navigate(`/experiments/${editId}`)
+      } else {
+        const res = await client.post('/experiments', buildPayload())
+        navigate(`/experiments/${res.data.id}`)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save experiment')
     } finally {
@@ -454,8 +480,14 @@ export default function ExperimentCreatePage() {
     setError('')
     setSaving(true)
     try {
-      const createRes = await client.post('/experiments', buildPayload())
-      const expId = createRes.data.id
+      let expId: number
+      if (isEditMode && editId) {
+        await client.put(`/experiments/${editId}`, buildPayload())
+        expId = Number(editId)
+      } else {
+        const createRes = await client.post('/experiments', buildPayload())
+        expId = createRes.data.id
+      }
       await client.post(`/experiments/${expId}/start`)
       navigate(`/experiments/${expId}`)
     } catch (e) {
@@ -502,7 +534,9 @@ export default function ExperimentCreatePage() {
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-2xl font-bold text-foreground">Create New Experiment</h1>
+        <h1 className="text-2xl font-bold text-foreground">
+          {isEditMode ? 'Edit Experiment' : 'Create New Experiment'}
+        </h1>
       </div>
 
       <div className="space-y-6">
@@ -870,7 +904,7 @@ export default function ExperimentCreatePage() {
             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            Save as Draft
+            {isEditMode ? 'Save Changes' : 'Save as Draft'}
           </button>
           <button
             type="button"
@@ -888,7 +922,7 @@ export default function ExperimentCreatePage() {
             className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="h-4 w-4" />
-            Save &amp; Start Training
+            {isEditMode ? 'Save & Start Training' : 'Create & Start Training'}
           </button>
         </div>
       </div>

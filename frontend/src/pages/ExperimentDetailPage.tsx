@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Play, Square, Trash2, Copy } from 'lucide-react'
+import { ArrowLeft, Pencil, Play, Square, Trash2, Copy } from 'lucide-react'
 import { useExperimentStore } from '@/stores/experimentStore'
 import StatusBadge from '@/components/StatusBadge'
 import MetricsChart from '@/components/MetricsChart'
@@ -79,8 +79,9 @@ export default function ExperimentDetailPage() {
     )
   }
 
+  const isDraft = selectedExperiment.status === ExperimentStatus.DRAFT
   const canStart =
-    selectedExperiment.status === ExperimentStatus.DRAFT ||
+    isDraft ||
     selectedExperiment.status === ExperimentStatus.QUEUED ||
     selectedExperiment.status === ExperimentStatus.CANCELLED
   const canStop = latestRun?.status === 'running'
@@ -169,6 +170,15 @@ export default function ExperimentDetailPage() {
             >
               <Square className="h-4 w-4" />
               Stop
+            </button>
+          )}
+          {isDraft && (
+            <button
+              onClick={() => navigate(`/experiments/${id}/edit`)}
+              className="flex items-center gap-2 rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
             </button>
           )}
           <button
