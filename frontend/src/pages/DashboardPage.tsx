@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useExperimentStore } from '@/stores/experimentStore'
+import { formatRelativeTime, formatAbsoluteTime } from '@/utils/time'
 import { ExperimentStatus } from '@/types/experiment'
 
 export default function DashboardPage() {
@@ -162,10 +163,8 @@ export default function DashboardPage() {
                   <span className="font-medium text-card-foreground">
                     {exp.name}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(
-                      exp.updated_at ?? exp.created_at,
-                    ).toLocaleDateString()}
+                  <span className="text-xs text-muted-foreground" title={formatAbsoluteTime(exp.updated_at ?? exp.created_at)}>
+                    {formatRelativeTime(exp.updated_at ?? exp.created_at)}
                   </span>
                 </li>
               ))}

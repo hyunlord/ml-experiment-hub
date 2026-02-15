@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Wrench } from 'lucide-react'
 import axios from 'axios'
+import { formatAbsoluteTime } from '@/utils/time'
 
 interface ConfigSchemaItem {
   id: number
@@ -105,7 +106,7 @@ export default function SchemasPage() {
                         <span>{groups.join(' / ')}</span>
                       )}
                       <span>
-                        Updated {new Date(schema.updated_at).toLocaleDateString()}
+                        Updated {formatAbsoluteTime(schema.updated_at)}
                       </span>
                     </div>
                   </div>

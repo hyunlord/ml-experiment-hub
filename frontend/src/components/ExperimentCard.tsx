@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import type { Experiment } from '@/types/experiment'
 import StatusBadge from './StatusBadge'
 import { Calendar } from 'lucide-react'
+import { formatAbsoluteTime } from '@/utils/time'
 
 interface ExperimentCardProps {
   experiment: Experiment
@@ -39,7 +40,7 @@ export default function ExperimentCard({ experiment }: ExperimentCardProps) {
         <div className="flex items-center gap-1">
           <Calendar className="h-4 w-4" />
           <span>
-            {new Date(experiment.created_at).toLocaleDateString()}
+            {formatAbsoluteTime(experiment.created_at)}
           </span>
         </div>
       </div>

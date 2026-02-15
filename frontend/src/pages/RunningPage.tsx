@@ -4,6 +4,7 @@ import { Activity, ExternalLink } from 'lucide-react'
 import { useExperimentStore } from '@/stores/experimentStore'
 import { ExperimentStatus } from '@/types/experiment'
 import StatusBadge from '@/components/StatusBadge'
+import { formatAbsoluteTime } from '@/utils/time'
 
 export default function RunningPage() {
   const navigate = useNavigate()
@@ -50,7 +51,7 @@ export default function RunningPage() {
               <p className="font-medium text-card-foreground">{exp.name}</p>
               <p className="text-xs text-muted-foreground">
                 {exp.tags?.[0] ?? ''} &middot; Updated{' '}
-                {new Date(exp.updated_at).toLocaleString()}
+                {formatAbsoluteTime(exp.updated_at)}
               </p>
             </div>
           </div>

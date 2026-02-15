@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils'
 import client from '@/api/client'
 import { addToQueue } from '@/api/queue'
+import { formatRelativeTime, formatAbsoluteTime } from '@/utils/time'
 
 // ---------------------------------------------------------------------------
 // Types (aligned with new backend ExperimentResponse)
@@ -547,7 +548,7 @@ export default function ExperimentListPage() {
                       </td>
                       {/* Date */}
                       <td className="px-3 py-3 text-xs text-muted-foreground">
-                        {formatDate(exp.created_at)}
+                        <span title={formatAbsoluteTime(exp.created_at)}>{formatRelativeTime(exp.created_at)}</span>
                       </td>
                       {/* Actions */}
                       <td className="px-3 py-3">
@@ -673,20 +674,4 @@ function ActionBtn({
       {children}
     </button>
   )
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHr = Math.floor(diffMin / 60)
-  const diffDay = Math.floor(diffHr / 24)
-
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffHr < 24) return `${diffHr}h ago`
-  if (diffDay < 7) return `${diffDay}d ago`
-
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }

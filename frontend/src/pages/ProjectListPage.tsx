@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderGit2, Plus, Tag, Clock, FlaskConical, GitBranch, FolderOpen, Shapes, Upload } from 'lucide-react'
+import { FolderGit2, Plus, Clock, FlaskConical, GitBranch, FolderOpen, Shapes, Upload, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getProjects } from '@/api/projects'
 import type { Project, ProjectStatus } from '@/types/project'
+import { formatRelativeTime, formatAbsoluteTime } from '@/utils/time'
 
 // ---------------------------------------------------------------------------
 // Status Badge Configuration
@@ -113,16 +114,8 @@ export default function ProjectListPage() {
         /* Project Grid */
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => {
-            const tags = project.tags || []
             const statusCfg = STATUS_CONFIG[project.status] || STATUS_CONFIG.registered
             const sourceTypeCfg = project.source_type ? SOURCE_TYPE_CONFIG[project.source_type] : null
-            const truncatedPath =
-              (project.path || '').length > 50
-                ? '...' + (project.path || '').slice(-47)
-                : (project.path || '')
-            const truncatedGitUrl = project.git_url && project.git_url.length > 40
-              ? project.git_url.slice(0, 37) + '...'
-              : project.git_url
 
             return (
               <div
@@ -130,28 +123,44 @@ export default function ProjectListPage() {
                 onClick={() => navigate(`/projects/${project.id}`)}
                 className="group cursor-pointer rounded-lg border border-border bg-card p-6 transition-all hover:border-primary/50 hover:shadow-md"
               >
-                {/* Header */}
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="mb-1 text-lg font-semibold text-foreground group-hover:text-primary">
-                      {project.name}
-                    </h3>
-                    <p
-                      className="text-xs text-muted-foreground"
-                      title={project.path}
+                {/* Title with icon */}
+                <div className="mb-3 flex items-center gap-2">
+                  <FolderGit2 className="h-5 w-5 flex-shrink-0 text-muted-foreground/50 group-hover:text-primary/50" />
+                  <h3 className="truncate text-lg font-semibold text-foreground group-hover:text-primary">
+                    {project.name}
+                  </h3>
+                </div>
+
+                {/* Description */}
+                {project.description && (
+                  <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
+                    {project.description}
+                  </p>
+                )}
+
+                {/* Git URL */}
+                {project.git_url && (
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                    <a
+                      href={project.git_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="truncate text-xs text-muted-foreground/70 hover:text-primary hover:underline"
+                      title={project.git_url}
                     >
-                      {truncatedPath}
-                    </p>
-                    {project.git_url && (
-                      <p
-                        className="mt-1 text-xs text-muted-foreground/70"
-                        title={project.git_url}
-                      >
-                        {truncatedGitUrl}
-                      </p>
-                    )}
+                      {shortenUrl(project.git_url)}
+                    </a>
                   </div>
-                  <FolderGit2 className="h-5 w-5 text-muted-foreground/50 group-hover:text-primary/50" />
+                )}
+
+                {/* Path */}
+                <div className="mb-4 flex items-center gap-1.5">
+                  <FolderOpen className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                  <p className="truncate text-xs text-muted-foreground" title={project.path}>
+                    {project.path}
+                  </p>
                 </div>
 
                 {/* Badges */}
@@ -191,44 +200,16 @@ export default function ProjectListPage() {
                   )}
                 </div>
 
-                {/* Metadata */}
-                <div className="space-y-2 border-t border-border pt-4">
-                  {/* Experiment Count */}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <FlaskConical className="h-3.5 w-3.5" />
-                    <span>
-                      {project.experiment_count} experiment
-                      {project.experiment_count !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-
-                  {/* Tags */}
-                  {tags.length > 0 && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Tag className="h-3.5 w-3.5" />
-                      <div className="flex flex-wrap gap-1">
-                        {tags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="rounded bg-secondary px-1.5 py-0.5 text-secondary-foreground"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {tags.length > 3 && (
-                          <span className="text-xs">
-                            +{tags.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Created At */}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>{formatDate(project.created_at)}</span>
-                  </div>
+                {/* Footer */}
+                <div className="flex items-center gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
+                  <FlaskConical className="h-3.5 w-3.5" />
+                  <span>
+                    {project.experiment_count} experiment
+                    {project.experiment_count !== 1 ? 's' : ''}
+                  </span>
+                  <span>·</span>
+                  <Clock className="h-3.5 w-3.5" />
+                  <span title={formatAbsoluteTime(project.created_at)}>{formatRelativeTime(project.created_at)}</span>
                 </div>
               </div>
             )
@@ -243,18 +224,6 @@ export default function ProjectListPage() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function formatDate(iso: string): string {
-  const d = new Date(iso)
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHr = Math.floor(diffMin / 60)
-  const diffDay = Math.floor(diffHr / 24)
-
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffHr < 24) return `${diffHr}h ago`
-  if (diffDay < 7) return `${diffDay}d ago`
-
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function shortenUrl(url: string): string {
+  return url.replace(/^https?:\/\//, '').replace(/\.git$/, '')
 }

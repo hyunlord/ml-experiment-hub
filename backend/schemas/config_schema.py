@@ -6,6 +6,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from backend.schemas.base import TimezoneAwareResponse
+
 
 class FieldType(str, Enum):
     """Supported field types for dynamic form generation."""
@@ -112,7 +114,7 @@ class ConfigSchemaUpdate(BaseModel):
     fields_schema: SchemaDefinition | None = None
 
 
-class ConfigSchemaResponse(BaseModel):
+class ConfigSchemaResponse(TimezoneAwareResponse):
     """Response schema for a ConfigSchema."""
 
     id: int
@@ -121,9 +123,6 @@ class ConfigSchemaResponse(BaseModel):
     fields_schema: dict[str, Any]
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ConfigSchemaListResponse(BaseModel):
