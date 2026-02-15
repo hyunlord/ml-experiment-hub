@@ -153,6 +153,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         await seed_datasets(session)
 
+    # Ensure PROJECTS_STORE_DIR exists
+    import os
+
+    os.makedirs(settings.PROJECTS_STORE_DIR, exist_ok=True)
+
     # Start system monitor service
     from backend.core.system_monitor import system_monitor
 
