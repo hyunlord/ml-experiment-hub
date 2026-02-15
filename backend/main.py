@@ -59,127 +59,132 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     _logger = logging.getLogger(__name__)
 
-    # Startup: Initialize database (with WAL mode for SQLite)
-    await init_db()
+    try:
+        # Startup: Ensure tables exist (migrations already ran in entrypoint.sh)
+        await init_db()
 
-    # Enable WAL mode for SQLite
-    from backend.models.database import engine
+        # Enable WAL mode for SQLite
+        from backend.models.database import engine
 
-    if "sqlite" in str(engine.url):
-        async with engine.begin() as conn:
-            await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
-            await conn.exec_driver_sql("PRAGMA synchronous=NORMAL")
-            _logger.info("SQLite WAL mode enabled")
+        if "sqlite" in str(engine.url):
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
+                await conn.exec_driver_sql("PRAGMA synchronous=NORMAL")
+                _logger.info("SQLite WAL mode enabled")
 
-    async with async_session_maker() as session:
-        # ── Recover or fail stale RUNNING runs ──
-        result = await session.execute(
-            select(ExperimentRun).where(ExperimentRun.status == RunStatus.RUNNING)
-        )
-        stale_runs = result.scalars().all()
-        recovered_count = 0
-        failed_count = 0
-        for run in stale_runs:
-            if _is_pid_alive(run.pid):
-                # Process still alive — log but leave as RUNNING
-                _logger.info(
-                    "Run %d (PID %d) still alive after restart, keeping RUNNING",
-                    run.id,
-                    run.pid,
-                )
-                recovered_count += 1
-            else:
-                run.status = RunStatus.FAILED
-                run.ended_at = datetime.utcnow()
-                failed_count += 1
-        if stale_runs:
-            await session.commit()
-            _logger.warning(
-                "Startup recovery: %d runs still alive, %d marked FAILED",
-                recovered_count,
-                failed_count,
+        async with async_session_maker() as session:
+            # ── Recover or fail stale RUNNING runs ──
+            result = await session.execute(
+                select(ExperimentRun).where(ExperimentRun.status == RunStatus.RUNNING)
             )
-
-        # ── Recover or fail stale RUNNING jobs ──
-        result = await session.execute(select(Job).where(Job.status == JobStatus.RUNNING))
-        stale_jobs = result.scalars().all()
-        for job in stale_jobs:
-            if _is_pid_alive(job.pid):
-                _logger.info(
-                    "Job %d (PID %d) still alive after restart, keeping RUNNING",
-                    job.id,
-                    job.pid,
+            stale_runs = result.scalars().all()
+            recovered_count = 0
+            failed_count = 0
+            for run in stale_runs:
+                if _is_pid_alive(run.pid):
+                    _logger.info(
+                        "Run %d (PID %d) still alive after restart, keeping RUNNING",
+                        run.id,
+                        run.pid,
+                    )
+                    recovered_count += 1
+                else:
+                    run.status = RunStatus.FAILED
+                    run.ended_at = datetime.utcnow()
+                    failed_count += 1
+            if stale_runs:
+                await session.commit()
+                _logger.warning(
+                    "Startup recovery: %d runs still alive, %d marked FAILED",
+                    recovered_count,
+                    failed_count,
                 )
-            else:
-                job.status = JobStatus.FAILED
-                job.ended_at = datetime.utcnow()
-                job.error_message = "Server restarted — process not found"
-        if stale_jobs:
-            await session.commit()
 
-        # ── Fail stale optuna studies ──
-        result = await session.execute(
-            select(OptunaStudy).where(OptunaStudy.status == JobStatus.RUNNING)
-        )
-        stale_studies = result.scalars().all()
-        if stale_studies:
-            for study in stale_studies:
-                study.status = JobStatus.FAILED
-            await session.commit()
+            # ── Recover or fail stale RUNNING jobs ──
+            result = await session.execute(select(Job).where(Job.status == JobStatus.RUNNING))
+            stale_jobs = result.scalars().all()
+            for job in stale_jobs:
+                if _is_pid_alive(job.pid):
+                    _logger.info(
+                        "Job %d (PID %d) still alive after restart, keeping RUNNING",
+                        job.id,
+                        job.pid,
+                    )
+                else:
+                    job.status = JobStatus.FAILED
+                    job.ended_at = datetime.utcnow()
+                    job.error_message = "Server restarted — process not found"
+            if stale_jobs:
+                await session.commit()
 
-        # ── Fail stale queue entries ──
-        from backend.models.experiment import DatasetDefinition, QueueEntry
-        from shared.schemas import QueueStatus
+            # ── Fail stale optuna studies ──
+            result = await session.execute(
+                select(OptunaStudy).where(OptunaStudy.status == JobStatus.RUNNING)
+            )
+            stale_studies = result.scalars().all()
+            if stale_studies:
+                for study in stale_studies:
+                    study.status = JobStatus.FAILED
+                await session.commit()
 
-        result = await session.execute(
-            select(QueueEntry).where(QueueEntry.status == QueueStatus.RUNNING)
-        )
-        stale_queue = result.scalars().all()
-        if stale_queue:
-            for qe in stale_queue:
-                qe.status = QueueStatus.FAILED
-                qe.error_message = "Server restarted"
-            await session.commit()
+            # ── Fail stale queue entries ──
+            from backend.models.experiment import DatasetDefinition, QueueEntry
+            from shared.schemas import QueueStatus
 
-        # ── Clean up stale prepare jobs on datasets ──
-        result = await session.execute(
-            select(DatasetDefinition).where(DatasetDefinition.prepare_job_id.is_not(None))  # type: ignore[union-attr]
-        )
-        stale_ds = result.scalars().all()
-        if stale_ds:
-            for ds in stale_ds:
-                ds.prepare_job_id = None
-            await session.commit()
+            result = await session.execute(
+                select(QueueEntry).where(QueueEntry.status == QueueStatus.RUNNING)
+            )
+            stale_queue = result.scalars().all()
+            if stale_queue:
+                for qe in stale_queue:
+                    qe.status = QueueStatus.FAILED
+                    qe.error_message = "Server restarted"
+                await session.commit()
 
-        # ── Seed dataset definitions ──
-        from backend.services.dataset_registry import seed_datasets
+            # ── Clean up stale prepare jobs on datasets ──
+            result = await session.execute(
+                select(DatasetDefinition).where(DatasetDefinition.prepare_job_id.is_not(None))  # type: ignore[union-attr]
+            )
+            stale_ds = result.scalars().all()
+            if stale_ds:
+                for ds in stale_ds:
+                    ds.prepare_job_id = None
+                await session.commit()
 
-        await seed_datasets(session)
+            # ── Seed dataset definitions ──
+            from backend.services.dataset_registry import seed_datasets
 
-    # Ensure PROJECTS_STORE_DIR exists
-    import os
+            await seed_datasets(session)
 
-    os.makedirs(settings.PROJECTS_STORE_DIR, exist_ok=True)
+        # Ensure PROJECTS_STORE_DIR exists
+        import os
 
-    # Start system monitor service
-    from backend.core.system_monitor import system_monitor
+        os.makedirs(settings.PROJECTS_STORE_DIR, exist_ok=True)
 
-    system_monitor.start()
+        # Start system monitor service
+        from backend.core.system_monitor import system_monitor
 
-    # Start system history collection service
-    from backend.services.system_history import system_history_service
+        system_monitor.start()
 
-    system_history_service.start()
+        # Start system history collection service
+        from backend.services.system_history import system_history_service
 
-    # Start queue scheduler
-    from backend.services.queue_scheduler import queue_scheduler
+        system_history_service.start()
 
-    queue_scheduler.start()
+        # Start queue scheduler
+        from backend.services.queue_scheduler import queue_scheduler
 
-    # Start log archive service
-    from backend.services.log_manager import log_archive_service
+        queue_scheduler.start()
 
-    log_archive_service.start()
+        # Start log archive service
+        from backend.services.log_manager import log_archive_service
+
+        log_archive_service.start()
+
+    except Exception:
+        _logger.error("FATAL: Startup failed with exception:")
+        traceback.print_exc()
+        raise
 
     yield
 
