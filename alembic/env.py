@@ -13,11 +13,18 @@ from alembic import context
 # Import all models so they register with SQLModel.metadata
 from backend.models import (  # noqa: F401
     ConfigSchema,
+    DatasetDefinition,
     ExperimentConfig,
     ExperimentRun,
     GitCredential,
+    Job,
     MetricLog,
+    OptunaStudy,
+    OptunaTrialResult,
     Project,
+    QueueEntry,
+    Server,
+    SystemHistorySnapshot,
     SystemStats,
 )
 
