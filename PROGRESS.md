@@ -1,5 +1,62 @@
 # Progress Log
 
+## Milestone 10: Experiment Create Page Redesign
+
+### Status: COMPLETE
+
+### Summary
+Full redesign of the experiment creation page with a config-driven workflow. Users now select
+a project, pick a base config YAML file, and get an auto-generated editable form with type-aware
+inputs. Three view modes (Form/YAML/Diff) provide flexibility for editing and reviewing changes.
+Backend config parser service reads YAML files, infers value types, and groups parameters.
+
+### Tasks
+| # | Task | Status |
+|---|------|--------|
+| T-120 | Backend config parser service (YAML parse + type inference + grouping) | DONE |
+| T-121 | Backend API endpoint + schema changes (parse-config, ExperimentCreate extension) | DONE |
+| T-122 | Frontend API client + types for config parsing | DONE |
+| T-123 | Frontend ExperimentCreatePage full redesign (Form/YAML/Diff views) | DONE |
+| T-124 | Gate verification + commit | DONE |
+
+### New Files Created
+- `backend/services/config_parser.py` — YAML/JSON config parser with type inference (string, integer, float, boolean, array, object) and top-level key grouping
+
+### Files Modified
+- `backend/api/projects.py` — Added `POST /{project_id}/parse-config` endpoint
+- `backend/schemas/project.py` — Added `ParseConfigRequest`, `ParseConfigResponse` schemas
+- `backend/schemas/experiment.py` — Added `project_id`, `base_config_path` to `ExperimentCreate`
+- `backend/services/experiment_service.py` — Pass `project_id` on experiment creation
+- `frontend/src/types/project.ts` — Added `ParsedConfigValue`, `ParsedConfigResponse` types
+- `frontend/src/api/projects.ts` — Added `parseConfig()` API function
+- `frontend/src/pages/ExperimentCreatePage.tsx` — Complete rewrite (1200+ lines)
+
+### New API Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/projects/{id}/parse-config | Parse project config YAML into typed groups |
+
+### Key Features
+- **Project-first workflow**: Select project → pick config file → auto-parse → edit → create
+- **Config parser**: Reads YAML/JSON, infers types, groups by top-level keys, preserves raw content
+- **Form View**: Collapsible groups with type-specific inputs (text, number with step, boolean toggle, array tags, object JSON)
+- **YAML View**: Raw YAML editing with Apply button for one-way sync to form
+- **Diff View**: Line-by-line comparison of original vs modified config with color highlighting
+- **Change tracking**: Blue dot indicators on modified fields, change count badge on Diff tab
+- **Per-field actions**: Copy to clipboard, reset to original, delete parameter (on hover)
+- **Add Parameter**: Dialog to add new parameters with group/key/type/value selection
+- **Query param linking**: `?project_id=X&config=Y` from ProjectDetailPage for deep-linking
+- **Auto-naming**: Experiment name auto-generated as `{project}_{configName}_001`
+- **Confirmation dialogs**: Warn before switching project/config with unsaved changes
+
+### Gate
+- 258 tests passed, 0 failures
+- Lint clean (ruff check + format)
+- TypeScript clean (tsc --noEmit)
+- Smoke test passed
+
+---
+
 ## Milestone 9 v2: Enhanced Project Registration (4 Source Types)
 
 ### Status: COMPLETE

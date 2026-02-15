@@ -77,6 +77,7 @@ class ExperimentService:
             description=data.description,
             config_json=data.config,
             config_schema_id=data.schema_id,
+            project_id=data.project_id,
             tags=data.tags,
             status=ExperimentConfigStatus.DRAFT,
         )

@@ -322,6 +322,20 @@ class ConfigContentResponse(BaseModel):
     format: str
 
 
+class ParseConfigRequest(BaseModel):
+    """Request to parse a project config file."""
+
+    config_path: str = Field(min_length=1, description="Relative path to config file")
+
+
+class ParseConfigResponse(BaseModel):
+    """Response with parsed config structure for dynamic form generation."""
+
+    raw_yaml: str
+    parsed: dict[str, Any]
+    groups: list[str]
+
+
 class GitInfoResponse(BaseModel):
     """Git information for a project."""
 

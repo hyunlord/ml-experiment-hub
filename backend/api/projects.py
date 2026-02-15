@@ -13,6 +13,8 @@ from backend.schemas.project import (
     CloneStatusResponse,
     ConfigContentResponse,
     GitInfoResponse,
+    ParseConfigRequest,
+    ParseConfigResponse,
     ProjectCreate,
     ProjectListResponse,
     ProjectResponse,
@@ -268,6 +270,30 @@ async def get_project_git_info(
         raise HTTPException(status_code=404, detail="Project not found")
     info = get_git_info(project.path)
     return GitInfoResponse(**info)
+
+
+@router.post("/{project_id}/parse-config", response_model=ParseConfigResponse)
+async def parse_config(
+    project_id: int,
+    body: ParseConfigRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ParseConfigResponse:
+    """Parse a config file from a project and return structured representation."""
+    from backend.services.config_parser import parse_config_file
+
+    service = ProjectService(session)
+    project = await service.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    try:
+        result = parse_config_file(project.path, body.config_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Config file not found")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return ParseConfigResponse(**result)
 
 
 @router.get("/{project_id}/configs/{config_path:path}", response_model=ConfigContentResponse)

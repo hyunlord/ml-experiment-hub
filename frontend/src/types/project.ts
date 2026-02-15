@@ -216,3 +216,15 @@ export interface TemplateConfigSchema {
   task_id: string | null
   fields: Record<string, unknown>
 }
+
+// Config parsing types
+export interface ParsedConfigValue {
+  value: unknown
+  type: 'string' | 'integer' | 'float' | 'boolean' | 'array' | 'object'
+}
+
+export interface ParsedConfigResponse {
+  raw_yaml: string
+  parsed: Record<string, Record<string, ParsedConfigValue>>
+  groups: string[]
+}
