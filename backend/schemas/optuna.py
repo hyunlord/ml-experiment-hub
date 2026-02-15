@@ -32,7 +32,7 @@ class CreateStudyRequest(BaseModel):
     search_epochs: int = Field(default=5, ge=1, le=100)
     subset_ratio: float = Field(default=0.1, ge=0.01, le=1.0)
     pruner: str = Field(default="median")
-    objective_metric: str = Field(default="val/map_i2t")
+    objective_metric: str = Field(default="val/loss")
     direction: str = Field(default="maximize")
 
 

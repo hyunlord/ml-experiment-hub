@@ -135,6 +135,43 @@ class VLMQuantizationAdapter(BaseAdapter):
         return config
 
     # ------------------------------------------------------------------
+    # Hyperparameter search ranges
+    # ------------------------------------------------------------------
+
+    def get_search_ranges(self) -> dict[str, dict[str, Any]]:
+        """Recommended search ranges for cross-modal hashing."""
+        return {
+            "training.lr": {
+                "type": "float",
+                "low": 1e-5,
+                "high": 1e-2,
+                "log": True,
+            },
+            "training.temperature": {
+                "type": "float",
+                "low": 0.01,
+                "high": 0.2,
+                "log": False,
+            },
+            "loss.quantization_weight": {
+                "type": "float",
+                "low": 0.01,
+                "high": 1.0,
+                "log": True,
+            },
+            "loss.balance_weight": {
+                "type": "float",
+                "low": 0.01,
+                "high": 1.0,
+                "log": True,
+            },
+            "model.hash_dim": {
+                "type": "categorical",
+                "choices": [64, 128, 256],
+            },
+        }
+
+    # ------------------------------------------------------------------
     # Search / Index capabilities
     # ------------------------------------------------------------------
 
