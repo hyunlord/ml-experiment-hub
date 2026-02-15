@@ -36,19 +36,6 @@ interface MetricPoint {
 
 const EXP_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b']
 
-// Metrics shown by default in the overlay chart
-const DEFAULT_CHART_METRICS = ['val/map_i2t', 'val/total', 'val/map_t2i']
-
-// Metrics shown in the final comparison table
-const FINAL_TABLE_METRICS = [
-  'val/map_i2t',
-  'val/map_t2i',
-  'val/p@1',
-  'val/p@5',
-  'val/total',
-  'train/total',
-]
-
 // ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
@@ -106,8 +93,9 @@ export default function ExperimentComparePage() {
   const [loading, setLoading] = useState(true)
   const [diffOnly, setDiffOnly] = useState(false)
   const [selectedChartMetrics, setSelectedChartMetrics] = useState<Set<string>>(
-    new Set(DEFAULT_CHART_METRICS),
+    new Set<string>(),
   )
+  const [chartMetricsInitialized, setChartMetricsInitialized] = useState(false)
 
   // Fetch experiments + metrics in parallel
   useEffect(() => {
@@ -189,6 +177,15 @@ export default function ExperimentComparePage() {
     return Array.from(keySet).sort()
   }, [metricsMap])
 
+  // Auto-select first few val/ metrics (or first 3) when data arrives
+  useEffect(() => {
+    if (chartMetricsInitialized || allMetricKeys.length === 0) return
+    const valKeys = allMetricKeys.filter((k) => k.startsWith('val/'))
+    const initial = valKeys.length > 0 ? valKeys.slice(0, 3) : allMetricKeys.slice(0, 3)
+    setSelectedChartMetrics(new Set(initial))
+    setChartMetricsInitialized(true)
+  }, [allMetricKeys, chartMetricsInitialized])
+
   // ---------------------------------------------------------------------------
   // Chart data: merge experiment metrics by step for selected chart metrics
   // ---------------------------------------------------------------------------
@@ -223,14 +220,14 @@ export default function ExperimentComparePage() {
   // ---------------------------------------------------------------------------
 
   const finalMetrics = useMemo(() => {
-    // Get all val/ metrics that exist
-    const metricKeys = FINAL_TABLE_METRICS.filter((k) => allMetricKeys.includes(k))
-    // Also add any val/ keys not in defaults
-    for (const k of allMetricKeys) {
-      if (k.startsWith('val/') && !metricKeys.includes(k)) {
-        metricKeys.push(k)
-      }
-    }
+    // Show all metric keys dynamically — no hardcoded list.
+    // Sort: val/ metrics first, then train/ metrics, then the rest.
+    const metricKeys = [...allMetricKeys].sort((a, b) => {
+      const aIsVal = a.startsWith('val/') ? 0 : a.startsWith('train/') ? 1 : 2
+      const bIsVal = b.startsWith('val/') ? 0 : b.startsWith('train/') ? 1 : 2
+      if (aIsVal !== bIsVal) return aIsVal - bIsVal
+      return a.localeCompare(b)
+    })
 
     const rows: { key: string; values: Map<number, number | null>; bestId: number | null }[] = []
 
