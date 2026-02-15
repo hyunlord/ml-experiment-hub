@@ -33,6 +33,7 @@ async def list_experiments(
     limit: int = Query(default=100, ge=1, le=1000),
     status: ExperimentConfigStatus | None = None,
     schema_id: int | None = Query(default=None),
+    project_id: int | None = Query(default=None),
     tags: list[str] | None = Query(default=None),
 ) -> ExperimentListResponse:
     """List experiment configurations with pagination and filters."""
@@ -43,8 +44,11 @@ async def list_experiments(
         status=status,
         schema_id=schema_id,
         tags=tags,
+        project_id=project_id,
     )
-    total = await service.count_experiments(status=status, schema_id=schema_id)
+    total = await service.count_experiments(
+        status=status, schema_id=schema_id, project_id=project_id
+    )
     return ExperimentListResponse(
         experiments=[ExperimentResponse.from_model(exp) for exp in experiments],
         total=total,
@@ -244,6 +248,10 @@ async def compare_experiments(
                 config=experiment.config_json or {},
                 metrics_summary=latest_run.metrics_summary if latest_run else None,
                 status=experiment.status.value,
+                project_name=experiment.project_name,
+                project_git_commit=experiment.project_git_commit,
+                project_git_branch=experiment.project_git_branch,
+                project_git_dirty=experiment.project_git_dirty,
             )
         )
 

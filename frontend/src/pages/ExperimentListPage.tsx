@@ -35,12 +35,23 @@ interface ExperimentRow {
   status: ExperimentStatus
   config: Record<string, unknown>
   schema_id: number | null
+  project_id: number | null
   tags: string[]
   created_at: string
   updated_at: string
+  // Project snapshot
+  project_name: string | null
+  project_git_branch: string | null
+  project_git_commit: string | null
+  project_git_dirty: boolean
   // Enriched client-side
   best_metric?: number | null
   progress?: string | null // e.g. "epoch 3/30"
+}
+
+interface ProjectOption {
+  id: number
+  name: string
 }
 
 type SortKey = 'id' | 'name' | 'created_at' | 'best_metric'
@@ -71,6 +82,8 @@ export default function ExperimentListPage() {
 
   // ── Filters ───────────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState<ExperimentStatus | 'all'>('all')
+  const [projectFilter, setProjectFilter] = useState<number | 'all'>('all')
+  const [projects, setProjects] = useState<ProjectOption[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
 
@@ -92,6 +105,20 @@ export default function ExperimentListPage() {
     return Array.from(tagSet).sort()
   }, [experiments])
 
+  // ── Fetch projects for filter dropdown ────────────────────────────
+  useEffect(() => {
+    client
+      .get('/projects', { params: { limit: 200 } })
+      .then((res) => {
+        const list = (res.data.projects || []).map((p: { id: number; name: string }) => ({
+          id: p.id,
+          name: p.name,
+        }))
+        setProjects(list)
+      })
+      .catch(() => {})
+  }, [])
+
   // ── Fetch experiments ─────────────────────────────────────────────
   const fetchExperiments = useCallback(async () => {
     setLoading(true)
@@ -101,6 +128,7 @@ export default function ExperimentListPage() {
         limit: pageSize,
       }
       if (statusFilter !== 'all') params.status = statusFilter
+      if (projectFilter !== 'all') params.project_id = projectFilter
 
       const res = await client.get('/experiments', { params })
       const data = res.data
@@ -111,7 +139,7 @@ export default function ExperimentListPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter])
+  }, [page, statusFilter, projectFilter])
 
   useEffect(() => {
     fetchExperiments()
@@ -304,6 +332,25 @@ export default function ExperimentListPage() {
             </option>
           ))}
         </select>
+
+        {/* Project filter */}
+        {projects.length > 0 && (
+          <select
+            value={projectFilter === 'all' ? 'all' : String(projectFilter)}
+            onChange={(e) => {
+              setProjectFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))
+              setPage(0)
+            }}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="all">All Projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        )}
 
         {/* Tag chips */}
         {allTags.length > 0 && (
@@ -498,7 +545,37 @@ export default function ExperimentListPage() {
                       {/* Name */}
                       <td className="px-3 py-3">
                         <div className="font-medium text-foreground">{exp.name}</div>
-                        {exp.description && (
+                        {exp.project_name && (
+                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span
+                              className="cursor-pointer hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (exp.project_id) navigate(`/projects/${exp.project_id}`)
+                              }}
+                              title={`Project: ${exp.project_name}`}
+                            >
+                              {exp.project_name}
+                            </span>
+                            {exp.project_git_branch && (
+                              <>
+                                <span className="text-border">·</span>
+                                <span className="font-mono">
+                                  {exp.project_git_branch}
+                                  {exp.project_git_commit && (
+                                    <span className="ml-1 text-muted-foreground/70">
+                                      @{exp.project_git_commit.slice(0, 7)}
+                                    </span>
+                                  )}
+                                  {exp.project_git_dirty && (
+                                    <span className="ml-0.5 text-orange-500" title="Uncommitted changes at creation">*</span>
+                                  )}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {!exp.project_name && exp.description && (
                           <div className="mt-0.5 truncate text-xs text-muted-foreground">
                             {exp.description}
                           </div>

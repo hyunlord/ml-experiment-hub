@@ -25,6 +25,14 @@ export interface Experiment {
   tags: string[]
   created_at: string
   updated_at: string
+  // Project snapshot (captured at experiment creation)
+  project_name: string | null
+  project_git_url: string | null
+  project_git_branch: string | null
+  project_git_commit: string | null
+  project_git_message: string | null
+  project_git_dirty: boolean
+  project_python_env: string | null
 }
 
 export interface ExperimentRun {

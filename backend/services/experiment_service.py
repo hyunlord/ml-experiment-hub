@@ -1,5 +1,6 @@
 """Business logic for experiment management."""
 
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -7,11 +8,14 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import func, select
 
-from backend.models.experiment import ConfigSchema, ExperimentConfig
+from backend.models.experiment import ConfigSchema, ExperimentConfig, Project
 from backend.schemas.config_schema import SchemaDefinition
 from backend.schemas.experiment import ExperimentCreate, ExperimentUpdate
+from backend.services.project_service import get_git_info
 from shared.schemas import ExperimentConfigStatus
 from shared.utils import diff_configs
+
+logger = logging.getLogger(__name__)
 
 
 class ExperimentService:
@@ -28,6 +32,7 @@ class ExperimentService:
         status: ExperimentConfigStatus | None = None,
         schema_id: int | None = None,
         tags: list[str] | None = None,
+        project_id: int | None = None,
     ) -> list[ExperimentConfig]:
         """List experiment configurations with pagination and filters."""
         query = select(ExperimentConfig)
@@ -35,6 +40,8 @@ class ExperimentService:
             query = query.where(ExperimentConfig.status == status)
         if schema_id is not None:
             query = query.where(ExperimentConfig.config_schema_id == schema_id)
+        if project_id is not None:
+            query = query.where(ExperimentConfig.project_id == project_id)
         if tags:
             # Filter experiments that contain ALL specified tags (AND logic).
             # JSON array containment varies by DB; for SQLite we use Python
@@ -55,6 +62,7 @@ class ExperimentService:
         self,
         status: ExperimentConfigStatus | None = None,
         schema_id: int | None = None,
+        project_id: int | None = None,
     ) -> int:
         """Count total experiment configurations with optional filters."""
         query = select(func.count()).select_from(ExperimentConfig)
@@ -62,6 +70,8 @@ class ExperimentService:
             query = query.where(ExperimentConfig.status == status)
         if schema_id is not None:
             query = query.where(ExperimentConfig.config_schema_id == schema_id)
+        if project_id is not None:
+            query = query.where(ExperimentConfig.project_id == project_id)
         result = await self.session.execute(query)
         count = result.scalar()
         return count if count is not None else 0
@@ -75,6 +85,9 @@ class ExperimentService:
         if data.schema_id is not None:
             await self._validate_config_against_schema(data.schema_id, data.config)
 
+        # Collect project snapshot for reproducibility
+        snapshot = await self._collect_project_snapshot(data.project_id)
+
         db_experiment = ExperimentConfig(
             name=data.name,
             description=data.description,
@@ -83,6 +96,7 @@ class ExperimentService:
             project_id=data.project_id,
             tags=data.tags,
             status=ExperimentConfigStatus.DRAFT,
+            **snapshot,
         )
         self.session.add(db_experiment)
         await self.session.commit()
@@ -153,13 +167,18 @@ class ExperimentService:
         if not source:
             return None
 
+        # Collect fresh git snapshot from the project
+        snapshot = await self._collect_project_snapshot(source.project_id)
+
         clone = ExperimentConfig(
             name=f"{source.name} (copy)",
             description=source.description,
             config_json=dict(source.config_json) if source.config_json else {},
             config_schema_id=source.config_schema_id,
+            project_id=source.project_id,
             tags=list(source.tags) if source.tags else [],
             status=ExperimentConfigStatus.DRAFT,
+            **snapshot,
         )
         self.session.add(clone)
         await self.session.commit()
@@ -217,6 +236,37 @@ class ExperimentService:
                 return False, candidate
 
         return False, f"{base}_new"
+
+    async def _collect_project_snapshot(self, project_id: int | None) -> dict[str, Any]:
+        """Collect git state snapshot from the project for reproducibility.
+
+        Returns a dict of snapshot fields to splat into ExperimentConfig kwargs.
+        """
+        if project_id is None:
+            return {}
+
+        result = await self.session.execute(select(Project).where(Project.id == project_id))
+        project = result.scalar_one_or_none()
+        if not project:
+            return {}
+
+        snapshot: dict[str, Any] = {
+            "project_name": project.name,
+            "project_git_url": project.git_url,
+            "project_python_env": project.python_env,
+        }
+
+        # Collect live git state from the project directory
+        try:
+            git_info = get_git_info(project.path)
+            snapshot["project_git_branch"] = git_info.get("branch")
+            snapshot["project_git_commit"] = git_info.get("last_commit_hash")
+            snapshot["project_git_message"] = git_info.get("last_commit_message")
+            snapshot["project_git_dirty"] = git_info.get("dirty", False)
+        except Exception:
+            logger.debug("Git snapshot collection failed for project %s", project_id, exc_info=True)
+
+        return snapshot
 
     async def _validate_name_unique(
         self,
