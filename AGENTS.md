@@ -24,10 +24,27 @@ Your operating mode:
 | Architecture decisions | ✅ Owns | ❌ Flag & wait |
 | Shared interfaces / base classes | ✅ Owns | ❌ Don't modify |
 | Plugin registration / schema changes | ✅ Owns | ❌ Flag if needed |
+| DB migrations (Alembic) | ✅ Owns | ❌ Never touch |
 | Feature implementation within ticket | Delegates | ✅ Owns |
 | Tests for your changes | Reviews | ✅ Owns |
 | Smoke tests for pipeline changes | Defines criteria | ✅ Implements |
 | Cross-ticket integration | ✅ Owns | ❌ Out of scope |
+
+## How You Are Invoked
+
+You are dispatched automatically by Claude Code (the lead) via Codex CLI:
+
+```bash
+bash tools/codex_dispatch.sh tickets/<ticket-file>.md [branch-name]
+```
+
+This means:
+- Your ticket content comes from a file in `tickets/`. Read it carefully — it is your **sole source of truth**.
+- You are working on an isolated branch (e.g. `t/010-smoke-train`). All commits go to this branch.
+- The lead may dispatch multiple tickets in parallel. **Do not touch files outside your ticket's Scope section.** File conflicts between parallel tickets will break the pipeline.
+- When you finish, the lead will run `codex apply` to pull your diff, then `bash scripts/gate.sh` to verify. If gate fails because of your changes, your ticket will be rejected or re-dispatched.
+- You do not interact with the user. You do not ask questions. If something is unclear, **flag it in your summary report** and implement the most conservative interpretation.
+- The gate for this project uses `uv` with frozen lockfile. Do NOT modify `uv.lock` or `pyproject.toml` dependencies unless the ticket explicitly requires it. Dependency changes will cause gate to fail.
 
 ---
 
@@ -65,6 +82,7 @@ Ask yourself: "Would the lead architect say this is overcomplicated?" If yes, si
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code or bugs, mention them in your report — don't fix them.
 - Remove imports/variables/functions that YOUR changes made unused.
+- **Parallel safety:** Other tickets may be running simultaneously. Touching files outside your scope risks merge conflicts that break the entire pipeline.
 
 The test: **Every changed line should trace directly to the ticket's objective.**
 
@@ -95,11 +113,13 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 ### For each ticket:
 
 1. **Read** the ticket fully. Understand objective, non-goals, and acceptance criteria.
-2. **Plan** — mentally map which files change, which interfaces are affected, which tests to write. If scope is unclear, flag it.
-3. **Implement** exactly what the ticket asks. No extras. No "while I'm here" improvements.
-4. **Test** — write or extend tests as specified. Include a smoke test for any pipeline change.
-5. **Gate** — run `./scripts/gate.sh` before reporting.
-6. **Report** with this structure:
+2. **Scope check** — verify the files listed in the ticket's Scope section. If you need to touch a file NOT listed, flag it in your report. Do not silently expand scope.
+3. **Plan** — mentally map which files change, which interfaces are affected, which tests to write. If scope is unclear, flag it.
+4. **Implement** exactly what the ticket asks. No extras. No "while I'm here" improvements.
+5. **Test** — write or extend tests as specified. Include a smoke test for any pipeline change.
+6. **Gate** — run `bash scripts/gate.sh` before reporting.
+7. **Commit** all changes to the assigned branch with a clear message: `[t-XXX] <one-line summary>`
+8. **Report** with this structure:
 
 ```
 ## Summary
@@ -110,7 +130,7 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 
 ## Verification
 - pytest [test pattern]: PASS / FAIL
-- ./scripts/gate.sh: PASS / FAIL
+- bash scripts/gate.sh: PASS / FAIL
 - Smoke test [command]: PASS / FAIL
 
 ## Risks / Edge Cases
@@ -118,16 +138,21 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 
 ## Out-of-Scope Issues Found
 - [bugs or tech debt spotted but NOT fixed]
+
+## Assumptions Made
+- [any ambiguities that were resolved by conservative interpretation]
 ```
 
 ### Non-negotiables
 
-- **One ticket = one PR.** No scope creep across tickets.
+- **One ticket = one branch.** All commits go to the branch assigned by dispatch. No scope creep across tickets.
 - Keep diffs minimal. Do NOT refactor unrelated code.
 - Do NOT touch secrets or leak tokens/paths in logs.
 - Do NOT run destructive commands (`rm -rf`, `DROP TABLE`, etc.).
-- Do NOT add dependencies without explicit approval.
+- Do NOT add or modify dependencies in `pyproject.toml` or `uv.lock` unless the ticket explicitly requires it.
 - Do NOT modify shared interfaces (base classes, config schema, DB models) without lead approval.
+- Do NOT create or modify Alembic migrations — this is lead-only work.
+- Do NOT touch files outside your ticket's Scope section. Parallel tickets may be modifying other files simultaneously.
 
 ### Default Assumptions
 
@@ -156,7 +181,7 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 ## Gate
 
 ```bash
-./scripts/gate.sh
+bash scripts/gate.sh
 ```
 
 **A ticket is not done until gate passes.**
@@ -171,5 +196,8 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 6. **Forgetting smoke tests for new pipelines** — every pipeline must have a tiny-run path that completes in seconds.
 7. **Logging full tensors/arrays** — log shapes and summary stats, not raw data.
 8. **Fixing an unrelated bug inside a ticket's scope** — report it in Out-of-Scope, don't fix it.
-9. **Adding a new DB table without an Alembic migration** — schema changes need migrations, not raw SQL.
+9. **Adding a new DB table without an Alembic migration** — schema changes need migrations, not raw SQL. And migrations are lead-only work — flag it.
 10. **Skipping gate because "it's a small change"** — small changes cause the most subtle bugs.
+11. **Touching files outside ticket Scope** — parallel tickets may be modifying other files simultaneously; scope violations cause merge conflicts.
+12. **Modifying `pyproject.toml` or `uv.lock`** — the gate uses `uv sync --frozen`; unauthorized dependency changes will fail gate immediately.
+13. **Committing to the wrong branch** — always verify you're on the branch assigned by dispatch before committing.
