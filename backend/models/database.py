@@ -1,6 +1,5 @@
 """Database configuration and session management."""
 
-import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
@@ -27,24 +26,15 @@ async_session_maker = sessionmaker(
 )
 
 
-def _run_alembic_upgrade() -> None:
-    """Run Alembic migrations synchronously (meant to be called in a thread)."""
-    from alembic import command
-    from alembic.config import Config
-
-    alembic_cfg = Config("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
-
-
 async def init_db() -> None:
-    """Initialize database — run Alembic migrations, fallback to create_all."""
-    try:
-        await asyncio.to_thread(_run_alembic_upgrade)
-        logger.info("Alembic migrations applied successfully")
-    except Exception as e:
-        logger.warning("Alembic migration skipped (%s), using create_all fallback", e)
-        async with engine.begin() as conn:
-            await conn.run_sync(SQLModel.metadata.create_all)
+    """Initialize database — ensure all tables exist.
+
+    Migrations are handled by entrypoint.sh before the app starts.
+    This only creates missing tables as a safety net (e.g. local dev without Docker).
+    """
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+    logger.info("Database tables verified")
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:

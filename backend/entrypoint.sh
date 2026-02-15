@@ -14,14 +14,10 @@ echo "Running database migrations..."
 uv run alembic upgrade head && echo "Migrations OK" \
     || echo "WARNING: Migration failed, continuing with existing schema..."
 
-# Start gunicorn with uvicorn workers
+# Start uvicorn directly (better error output than gunicorn during development)
 echo "Starting server..."
-exec uv run gunicorn backend.main:app \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --workers 1 \
-    --bind 0.0.0.0:8002 \
-    --timeout 300 \
-    --graceful-timeout 30 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info
+exec uv run uvicorn backend.main:app \
+    --host 0.0.0.0 \
+    --port 8002 \
+    --log-level info \
+    --timeout-keep-alive 300
