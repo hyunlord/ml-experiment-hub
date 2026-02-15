@@ -53,6 +53,8 @@ export interface ExperimentCreate {
   description?: string
   config?: Record<string, unknown>
   schema_id?: number | null
+  project_id?: number | null
+  base_config_path?: string | null
   tags?: string[]
 }
 
