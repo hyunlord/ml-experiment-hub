@@ -25,6 +25,7 @@ Your operating mode:
 | Shared interfaces / base classes | ✅ Owns | ❌ Don't modify |
 | Plugin registration / schema changes | ✅ Owns | ❌ Flag if needed |
 | DB migrations (Alembic) | ✅ Owns | ❌ Never touch |
+| `pyproject.toml` / `uv.lock` | ✅ Owns | ❌ Never touch (unless ticket says so) |
 | Feature implementation within ticket | Delegates | ✅ Owns |
 | Tests for your changes | Reviews | ✅ Owns |
 | Smoke tests for pipeline changes | Defines criteria | ✅ Implements |
@@ -45,6 +46,14 @@ This means:
 - When you finish, the lead will run `codex apply` to pull your diff, then `bash scripts/gate.sh` to verify. If gate fails because of your changes, your ticket will be rejected or re-dispatched.
 - You do not interact with the user. You do not ask questions. If something is unclear, **flag it in your summary report** and implement the most conservative interpretation.
 - The gate for this project uses `uv` with frozen lockfile. Do NOT modify `uv.lock` or `pyproject.toml` dependencies unless the ticket explicitly requires it. Dependency changes will cause gate to fail.
+
+### What the lead expects from you
+
+The lead's workflow is: plan → split → dispatch → integrate. You are the "dispatch" step.
+- The lead has already decided this ticket is suitable for isolated implementation.
+- The lead will handle integration wiring, shared interfaces, DB migrations, and dependency changes separately.
+- Your job is to deliver a clean, minimal, gate-passing implementation of exactly what the ticket says.
+- The faster and cleaner you deliver, the faster the lead can integrate and move to the next batch.
 
 ---
 
@@ -114,12 +123,13 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 
 1. **Read** the ticket fully. Understand objective, non-goals, and acceptance criteria.
 2. **Scope check** — verify the files listed in the ticket's Scope section. If you need to touch a file NOT listed, flag it in your report. Do not silently expand scope.
-3. **Plan** — mentally map which files change, which interfaces are affected, which tests to write. If scope is unclear, flag it.
-4. **Implement** exactly what the ticket asks. No extras. No "while I'm here" improvements.
-5. **Test** — write or extend tests as specified. Include a smoke test for any pipeline change.
-6. **Gate** — run `bash scripts/gate.sh` before reporting.
-7. **Commit** all changes to the assigned branch with a clear message: `[t-XXX] <one-line summary>`
-8. **Report** with this structure:
+3. **Check for existing code** — before creating a new file, verify it doesn't already exist. Before modifying a function, read the current implementation. The lead may have already done interface prep work (base classes, stubs, `__init__.py` exports) that you need to build on.
+4. **Plan** — mentally map which files change, which interfaces are affected, which tests to write. If scope is unclear, flag it.
+5. **Implement** exactly what the ticket asks. No extras. No "while I'm here" improvements.
+6. **Test** — write or extend tests as specified. Include a smoke test for any pipeline change.
+7. **Gate** — run `bash scripts/gate.sh` before reporting.
+8. **Commit** all changes to the assigned branch with a clear message: `[t-XXX] <one-line summary>`
+9. **Report** with this structure:
 
 ```
 ## Summary
@@ -153,6 +163,7 @@ Platform-agnostic ML experiment management system with plugin architecture. Hand
 - Do NOT modify shared interfaces (base classes, config schema, DB models) without lead approval.
 - Do NOT create or modify Alembic migrations — this is lead-only work.
 - Do NOT touch files outside your ticket's Scope section. Parallel tickets may be modifying other files simultaneously.
+- Do NOT modify `__init__.py` exports for packages you don't own — the lead manages public API surface.
 
 ### Default Assumptions
 
@@ -189,7 +200,7 @@ bash scripts/gate.sh
 ## Common Mistakes to Avoid
 
 1. **Hardcoding seeds in training code instead of config** — seeds belong in experiment config, not scattered in scripts.
-2. **Adding a new model type without registering it in the plugin system** — it won't be discoverable.
+2. **Adding a new model type without registering it in the plugin system** — it won't be discoverable. BUT: plugin registration is lead work. Just create the plugin file and flag registration in your report.
 3. **Changing metric computation without updating tests** — silent metric drift is the worst kind of bug.
 4. **Importing heavy libraries at module top level** — lazy-import expensive deps (torch, tensorflow) to keep CLI snappy.
 5. **Modifying shared base classes for one model's needs** — extend, don't modify; other plugins depend on the interface. Flag for lead if extension isn't possible.
@@ -201,3 +212,5 @@ bash scripts/gate.sh
 11. **Touching files outside ticket Scope** — parallel tickets may be modifying other files simultaneously; scope violations cause merge conflicts.
 12. **Modifying `pyproject.toml` or `uv.lock`** — the gate uses `uv sync --frozen`; unauthorized dependency changes will fail gate immediately.
 13. **Committing to the wrong branch** — always verify you're on the branch assigned by dispatch before committing.
+14. **Creating a file that already exists** — always check first; the lead may have prepped interfaces, stubs, or `__init__.py` exports that you should build on.
+15. **Modifying `__init__.py` public exports** — the lead manages which symbols are publicly exposed from each package.
