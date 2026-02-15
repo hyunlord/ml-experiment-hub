@@ -10,6 +10,7 @@ from backend.api import (
     compat,
     datasets,
     experiments,
+    filesystem,
     jobs,
     metrics,
     predict,
@@ -22,6 +23,7 @@ from backend.api import (
     settings as settings_api,
     studies,
     system,
+    templates,
 )
 from backend.config import settings
 from backend.models.database import init_db
@@ -218,6 +220,7 @@ app.include_router(metrics.router)
 app.include_router(runs.router)
 app.include_router(compat.router)
 app.include_router(datasets.router)
+app.include_router(filesystem.router)
 app.include_router(system.router)
 app.include_router(jobs.router)
 app.include_router(search.router)
@@ -226,6 +229,7 @@ app.include_router(queue.router)
 app.include_router(servers.router)
 app.include_router(settings_api.router)
 app.include_router(predict.router)
+app.include_router(templates.router)
 
 
 @app.get("/")

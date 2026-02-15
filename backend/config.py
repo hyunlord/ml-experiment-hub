@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     EXPERIMENT_DIR: str = "./experiments"
     PROJECTS_DIR: str = "./projects"
+    PROJECTS_STORE_DIR: str = "./projects"  # Clone/upload destination for registered projects
     CHECKPOINT_BASE_DIR: str = "./checkpoints"
     LOG_DIR: str = "./logs"
     DATA_DIR: str = "./data"

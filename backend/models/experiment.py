@@ -20,20 +20,54 @@ from shared.schemas import (
 )
 
 
+class GitCredential(SQLModel, table=True):
+    """Stored git credential for private repository access."""
+
+    __tablename__ = "git_credentials"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True, description="Display name, e.g. 'GitHub Personal'")
+    provider: str = Field(default="github", description="github, gitlab, bitbucket")
+    token: str = Field(description="Personal access token")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class Project(SQLModel, table=True):
     """Registered ML project.
 
-    Represents a user's ML project directory on the server.
-    Projects contain config files, training scripts, and checkpoints.
-    Experiments are always linked to a project.
+    Represents a user's ML project on the server. Projects can be registered
+    from 4 sources: github (cloned), local (existing path), template
+    (generated scaffold), or upload (user-uploaded files).
     """
 
     __tablename__ = "projects"
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(index=True, description="Display name")
+    source_type: str = Field(
+        default="local",
+        description="How project was registered: github, local, template, upload",
+    )
     path: str = Field(description="Absolute path to project directory on server")
     git_url: str | None = Field(default=None, description="Git remote URL")
+    git_branch: str | None = Field(default=None, description="Git branch")
+    git_token_id: int | None = Field(
+        default=None,
+        foreign_key="git_credentials.id",
+        description="FK to GitCredential for private repos",
+    )
+    template_type: str | None = Field(
+        default=None,
+        description="Template framework: pytorch-lightning, huggingface, etc.",
+    )
+    template_task: str | None = Field(
+        default=None,
+        description="Template task: image-classification, causal-lm, etc.",
+    )
+    template_model: str | None = Field(
+        default=None,
+        description="Template model name, e.g. google/siglip2-so400m-patch14-384",
+    )
     description: str = Field(default="")
     project_type: str = Field(
         default="custom",

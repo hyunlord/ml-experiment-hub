@@ -15,6 +15,7 @@ from backend.models import (  # noqa: F401
     ConfigSchema,
     ExperimentConfig,
     ExperimentRun,
+    GitCredential,
     MetricLog,
     Project,
     SystemStats,

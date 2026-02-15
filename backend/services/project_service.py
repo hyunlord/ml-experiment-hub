@@ -2,6 +2,7 @@
 
 import logging
 import subprocess
+import tomllib
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -12,11 +13,13 @@ from sqlmodel import func, select
 from backend.models.experiment import ExperimentConfig, Project
 from backend.schemas.project import (
     ConfigFileInfo,
+    GitLastCommit,
     ProjectCreate,
     ProjectUpdate,
     PythonEnvInfo,
     ScanResponse,
     ScriptFiles,
+    StructureInfo,
 )
 from shared.schemas import ProjectStatus
 
@@ -68,8 +71,14 @@ class ProjectService:
     async def create_project(self, data: ProjectCreate) -> Project:
         project = Project(
             name=data.name,
+            source_type=data.source_type,
             path=data.path,
             git_url=data.git_url,
+            git_branch=data.git_branch,
+            git_token_id=data.git_token_id,
+            template_type=data.template_type,
+            template_task=data.template_task,
+            template_model=data.template_model,
             description=data.description,
             project_type=data.project_type,
             train_command_template=data.train_command_template,
@@ -156,14 +165,18 @@ def scan_directory(path: str) -> ScanResponse:
     is_git = (root / ".git").is_dir()
     git_url: str | None = None
     git_branch: str | None = None
+    git_last_commit: GitLastCommit | None = None
 
     if is_git:
         git_url = _get_git_remote(root)
         git_branch = _get_git_branch(root)
+        git_last_commit = _get_last_commit(root)
 
     python_env = _detect_python_env(root)
     configs = _find_configs(root)
     scripts = _find_scripts(root)
+    structure = _detect_structure(root)
+    requirements = _parse_requirements(root)
 
     suggested_train = _suggest_train_command(root, python_env, scripts)
     suggested_eval = _suggest_eval_command(root, python_env, scripts)
@@ -173,9 +186,12 @@ def scan_directory(path: str) -> ScanResponse:
         is_git=is_git,
         git_url=git_url,
         git_branch=git_branch,
+        git_last_commit=git_last_commit,
         python_env=python_env,
         configs=configs,
         scripts=scripts,
+        structure=structure,
+        requirements=requirements,
         suggested_train_command=suggested_train,
         suggested_eval_command=suggested_eval,
     )
@@ -211,6 +227,121 @@ def _get_git_branch(root: Path) -> str | None:
     except Exception:
         pass
     return None
+
+
+def _get_last_commit(root: Path) -> GitLastCommit | None:
+    """Get last commit info from git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "log", "-1", "--format=%H%n%s%n%ai"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=str(root),
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            lines = result.stdout.strip().split("\n")
+            if len(lines) >= 3:
+                return GitLastCommit(
+                    hash=lines[0][:12],
+                    message=lines[1],
+                    date=lines[2],
+                )
+    except Exception:
+        pass
+    return None
+
+
+def _detect_structure(root: Path) -> StructureInfo:
+    """Detect directory structure of project."""
+    has_src = (root / "src").is_dir()
+    has_tests = (root / "tests").is_dir() or (root / "test").is_dir()
+    has_docker = (root / "Dockerfile").exists() or (root / "docker-compose.yml").exists()
+
+    # Find top-level directories
+    skip_dirs = {
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        "__pycache__",
+        "node_modules",
+        ".tox",
+        ".mypy_cache",
+        ".pytest_cache",
+        "dist",
+        "build",
+        ".eggs",
+    }
+
+    main_dirs: list[str] = []
+    try:
+        for item in sorted(root.iterdir()):
+            if item.is_dir() and not item.name.startswith(".") and item.name not in skip_dirs:
+                main_dirs.append(item.name)
+    except OSError:
+        pass
+
+    return StructureInfo(
+        has_src=has_src,
+        has_tests=has_tests,
+        has_docker=has_docker,
+        main_dirs=main_dirs,
+    )
+
+
+def _parse_requirements(root: Path) -> list[str]:
+    """Parse requirements from pyproject.toml or requirements.txt."""
+    requirements: list[str] = []
+
+    # Try pyproject.toml first
+    pyproject = root / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+                deps = data.get("project", {}).get("dependencies", [])
+                if deps:
+                    # Extract package names from dependency specs
+                    for dep in deps:
+                        # Remove version specifiers
+                        pkg = (
+                            dep.split("[")[0]
+                            .split(">")[0]
+                            .split("<")[0]
+                            .split("=")[0]
+                            .split("!")[0]
+                            .strip()
+                        )
+                        if pkg:
+                            requirements.append(pkg)
+                    return requirements
+        except Exception:
+            pass
+
+    # Fallback to requirements.txt
+    req_file = root / "requirements.txt"
+    if req_file.exists():
+        try:
+            content = req_file.read_text(errors="ignore")
+            for line in content.splitlines():
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    # Remove version specifiers
+                    pkg = (
+                        line.split("[")[0]
+                        .split(">")[0]
+                        .split("<")[0]
+                        .split("=")[0]
+                        .split("!")[0]
+                        .strip()
+                    )
+                    if pkg:
+                        requirements.append(pkg)
+        except OSError:
+            pass
+
+    return requirements
 
 
 def _detect_python_env(root: Path) -> PythonEnvInfo:

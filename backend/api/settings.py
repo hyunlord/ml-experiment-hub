@@ -1,10 +1,18 @@
 """REST API endpoints for hub settings (webhook, concurrency)."""
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.models.database import get_session
+from backend.schemas.project import (
+    GitCredentialCreate,
+    GitCredentialListResponse,
+    GitCredentialResponse,
+)
+from backend.services.git_credential_service import GitCredentialService
 from backend.services.notifier import get_hub_settings, test_webhook, update_hub_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -65,3 +73,35 @@ async def post_test_webhook(body: TestWebhookRequest) -> TestWebhookResponse:
     """Send a test message to the configured webhook."""
     result = await test_webhook(body.provider)
     return TestWebhookResponse(**result)
+
+
+@router.get("/git-credentials", response_model=GitCredentialListResponse)
+async def list_git_credentials(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> GitCredentialListResponse:
+    """List all stored git credentials (tokens masked)."""
+    service = GitCredentialService(session)
+    creds = await service.list_credentials()
+    return GitCredentialListResponse(credentials=creds)
+
+
+@router.post("/git-credentials", response_model=GitCredentialResponse, status_code=201)
+async def create_git_credential(
+    data: GitCredentialCreate,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> GitCredentialResponse:
+    """Store a new git credential."""
+    service = GitCredentialService(session)
+    return await service.create_credential(data)
+
+
+@router.delete("/git-credentials/{credential_id}", status_code=204)
+async def delete_git_credential(
+    credential_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> None:
+    """Delete a git credential."""
+    service = GitCredentialService(session)
+    deleted = await service.delete_credential(credential_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Credential not found")

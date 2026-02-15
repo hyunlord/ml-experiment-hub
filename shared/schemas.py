@@ -98,6 +98,7 @@ class ProjectStatus(str, Enum):
     """Status of a registered project."""
 
     REGISTERED = "registered"
+    CLONING = "cloning"
     SCANNING = "scanning"
     READY = "ready"
     ERROR = "error"
