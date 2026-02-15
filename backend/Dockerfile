@@ -14,9 +14,10 @@ WORKDIR /app
 # Install uv for fast dependency management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# System deps for pynvml (GPU monitoring) and general build
+# System deps for pynvml (GPU monitoring), git (clone service), and general build
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency specs first for layer caching
