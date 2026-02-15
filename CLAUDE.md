@@ -91,8 +91,8 @@ Lead engineer: architecture, integration, refactors, data model boundaries.
 | Worktree | Purpose | Agent |
 |----------|---------|-------|
 | `ml-experiment-hub-wt/lead` | Architecture, integration, refactors | Claude Code |
-| `ml-experiment-hub-wt/t-<id>-<slug>` | Isolated implementation tickets | Codex Pro |
-| `ml-experiment-hub-wt/gate` | Build verification | Codex CLI |
+| `ml-experiment-hub-wt/t-<id>-<slug>` | Isolated implementation tickets | Codex Pro (via CLI) |
+| `ml-experiment-hub-wt/gate` | Build verification | gate.sh |
 
 ## Guardrails
 
@@ -102,9 +102,60 @@ Lead engineer: architecture, integration, refactors, data model boundaries.
 - Config files are source of truth. No hardcoded overrides in code.
 - Metric definitions are schema — changes require explicit migration + changelog entry.
 
+---
+
+## Codex Pro Auto-Dispatch
+
+Claude Code delegates implementation tickets to Codex Pro via Codex CLI.
+**This is the primary method for getting tickets implemented. Use it for all isolated implementation work.**
+
+### Dispatch a ticket
+
+```bash
+bash tools/codex_dispatch.sh tickets/<ticket-file>.md [branch-name]
+```
+
+### Examples
+
+```bash
+# Single ticket
+bash tools/codex_dispatch.sh tickets/t-010-smoke-train.md
+
+# With explicit branch name
+bash tools/codex_dispatch.sh tickets/t-020-model-registry.md t/020-model-registry
+
+# Parallel dispatch (only when file scopes don't overlap, max 3)
+bash tools/codex_dispatch.sh tickets/t-010-smoke-train.md &
+bash tools/codex_dispatch.sh tickets/t-011-add-metrics-api.md &
+wait
+```
+
+### Check status
+
+```bash
+bash tools/codex_status.sh
+```
+
+### Apply completed results + gate verify
+
+```bash
+bash tools/codex_apply.sh
+```
+
+### Dispatch rules
+
+- **Always dispatch** isolated implementation tickets (single module, single endpoint, single test suite)
+- **Never dispatch** architecture changes, cross-service refactors, shared interface modifications, or DB schema migrations — do those in lead worktree directly
+- **Never dispatch** tickets that touch plugin base classes, protocol definitions, or Alembic migrations
+- Max 3 parallel dispatches if file scopes don't overlap
+- If Codex fails gate, either fix locally or rewrite the ticket and re-dispatch
+- After applying Codex results, always run gate and check cross-ticket interactions before merging
+
+---
+
 ## Delegation Template for Codex Tickets
 
-Every ticket delegated via `./tools/codex_ticket.sh` must include:
+Every ticket in `tickets/` must include:
 
 ```
 ## Objective
@@ -120,7 +171,7 @@ Files/dirs to touch:
 
 ## Acceptance Criteria
 - [ ] Tests pass: [specific test names or patterns]
-- [ ] Gate passes: ./scripts/gate.sh
+- [ ] Gate passes: bash scripts/gate.sh
 - [ ] Smoke test: [tiny-run command that completes in <30s]
 
 ## Risk Notes
@@ -134,17 +185,35 @@ Files/dirs to touch:
 
 **Quality bar:** If Codex needs to ask a follow-up question, the ticket was underspecified. Rewrite it.
 
+---
+
 ## Autopilot Workflow (NO follow-up questions)
 
 When the user gives a feature request:
 
 1. **Plan** — Create an implementation plan and split into 3–7 tickets. Surface any architectural decisions or tradeoffs before starting.
 2. **Sequence** — Order tickets by dependency. Identify which can parallelize.
-3. **Delegate or implement** — Use `./tools/codex_ticket.sh "<ticket prompt>"` for isolated implementation tickets. Keep architecture/integration/refactor work in the lead worktree.
-4. **Gate each ticket** — Run `./scripts/gate.sh` after each ticket. If Gate fails, fix and re-run until it passes.
-5. **Integrate** — After Codex tickets land, review and integrate in lead worktree. Resolve any cross-boundary conflicts.
-6. **Do not ask** the user for additional commands. Only ask questions if something is truly ambiguous; otherwise make reasonable defaults.
-7. **Summarize** — End by listing what changed (files, endpoints, schemas) and how to run the demo end-to-end.
+3. **Delegate** — For isolated implementation tickets, dispatch to Codex Pro:
+   ```bash
+   bash tools/codex_dispatch.sh tickets/<ticket>.md
+   ```
+   - Dispatch up to 3 non-overlapping tickets in parallel
+   - Monitor with: `bash tools/codex_status.sh`
+   - Apply results: `bash tools/codex_apply.sh`
+4. **Implement directly** — Keep architecture/integration/refactor/migration work in the lead worktree. Do not dispatch these to Codex.
+5. **Gate each ticket** — Run gate after each ticket lands:
+   ```bash
+   cd ~/github/ml-experiment-hub-wt/gate
+   git fetch origin
+   git reset --hard origin/lead/main
+   rm -rf .venv
+   bash scripts/gate.sh
+   ```
+6. **Integrate** — After Codex tickets land, review and integrate in lead worktree. Verify cross-ticket interactions (especially shared imports, DB state, config keys).
+7. **Do not ask** the user for additional commands. Only ask questions if something is truly ambiguous; otherwise make reasonable defaults.
+8. **Summarize** — End by listing what changed (files, endpoints, schemas) and how to run the demo end-to-end.
+
+---
 
 ## Common Mistakes to Avoid
 
@@ -158,3 +227,6 @@ When the user gives a feature request:
 8. **Hardcoding seeds in training scripts instead of config** — seeds belong in experiment config, nowhere else.
 9. **Logging full tensors or dataset samples** — log shapes and summary stats only (privacy + performance).
 10. **Merging Codex PRs without checking cross-ticket interactions** — each ticket is isolated; the lead must verify the integration.
+11. **Dispatching DB migration tickets to Codex** — Alembic migrations touch shared schema; always do these in lead worktree.
+12. **Dispatching overlapping tickets in parallel** — check file scopes before parallel dispatch; merge conflicts waste more time than sequential execution.
+13. **Forgetting `rm -rf .venv` before gate on this project** — uv frozen mode will fail if stale venv has wrong packages.
