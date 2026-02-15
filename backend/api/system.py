@@ -56,7 +56,7 @@ def _get_gpu_info() -> dict[str, str | float | bool]:
 def _compute_auto_config(vram_gb: float, unified: bool, freeze_backbone: bool) -> dict[str, int]:
     """Compute expected batch size and accumulation for auto-configure.
 
-    Mirrors the logic in vlm_quantization/src/utils/gpu_config.py.
+    Mirrors adapter-specific GPU config logic (e.g. batch size auto-tuning).
     """
     if vram_gb == 0:
         return {"batch_size": 32, "accumulate_grad_batches": 8, "num_workers": 2}

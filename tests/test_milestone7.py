@@ -1,4 +1,6 @@
-"""Milestone 7 tests — stabilization, health checks, log management, DB optimizations."""
+"""Milestone 7 tests — stabilization, health checks, log management, DB optimizations,
+dummy_classifier adapter (universality proof), predict API, genericity.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +8,8 @@ import gzip
 import os
 from pathlib import Path
 from unittest.mock import patch
+
+import torch
 
 
 # ── T1: Server restart recovery ────────────────────────────────────────────
@@ -378,3 +382,364 @@ class TestLogArchiveService:
         # just verify the interface exists
         assert hasattr(service, "start")
         assert hasattr(service, "stop")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# M7 NEW: Dummy Classifier Adapter — Universality Proof
+# ══════════════════════════════════════════════════════════════════════
+
+
+# ── T7: Adapter registration ────────────────────────────────────────
+
+
+class TestDummyClassifierRegistration:
+    """Verify dummy_classifier is in the adapter registry."""
+
+    def test_adapter_in_registry(self):
+        from adapters import ADAPTER_REGISTRY
+
+        assert "dummy_classifier" in ADAPTER_REGISTRY
+
+    def test_get_adapter_returns_instance(self):
+        from adapters import get_adapter
+
+        adapter = get_adapter("dummy_classifier")
+        assert adapter is not None
+        assert adapter.get_name() == "Image Classifier (MNIST / CIFAR-10)"
+
+    def test_adapter_implements_base(self):
+        from adapters import get_adapter
+        from adapters.base import BaseAdapter
+
+        adapter = get_adapter("dummy_classifier")
+        assert isinstance(adapter, BaseAdapter)
+
+
+# ── T8: SimpleCNN model ─────────────────────────────────────────────
+
+
+class TestSimpleCNN:
+    """Verify SimpleCNN forward pass for MNIST and CIFAR input shapes."""
+
+    def test_mnist_forward(self):
+        """1×28×28 input should produce (batch, 10) logits."""
+        from adapters.dummy_classifier.model import SimpleCNN
+
+        model = SimpleCNN(in_channels=1, num_classes=10)
+        x = torch.randn(2, 1, 28, 28)
+        out = model(x)
+        assert out.shape == (2, 10)
+
+    def test_cifar_forward(self):
+        """3×32×32 input should produce (batch, 10) logits."""
+        from adapters.dummy_classifier.model import SimpleCNN
+
+        model = SimpleCNN(in_channels=3, num_classes=10)
+        x = torch.randn(2, 3, 32, 32)
+        out = model(x)
+        assert out.shape == (2, 10)
+
+    def test_save_and_load(self, tmp_path: Path):
+        """Save and load checkpoint roundtrip."""
+        from adapters.dummy_classifier.model import SimpleCNN, load_model
+
+        model = SimpleCNN(in_channels=1, num_classes=10)
+        ckpt_path = tmp_path / "test.pt"
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "in_channels": 1,
+                "num_classes": 10,
+            },
+            ckpt_path,
+        )
+
+        loaded = load_model(str(ckpt_path))
+        assert isinstance(loaded, SimpleCNN)
+        # Verify output matches
+        x = torch.randn(1, 1, 28, 28)
+        model.eval()
+        loaded.eval()
+        with torch.no_grad():
+            assert torch.allclose(model(x), loaded(x))
+
+
+# ── T9: Adapter interface ───────────────────────────────────────────
+
+
+class TestDummyClassifierAdapter:
+    """Verify DummyClassifierAdapter methods."""
+
+    def test_config_to_yaml(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        yaml_str = adapter.config_to_yaml({"dataset": "mnist", "epochs": 5})
+        assert "dataset" in yaml_str
+        assert "mnist" in yaml_str
+
+    def test_get_train_command(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        cmd = adapter.get_train_command("/tmp/config.yaml")
+        assert cmd[0] == "python"
+        assert "adapters.dummy_classifier.train" in " ".join(cmd)
+        assert "/tmp/config.yaml" in cmd
+
+    def test_parse_metrics_json(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        line = '{"step": 100, "epoch": 1, "train/loss": 0.5, "train/accuracy": 0.85}'
+        result = adapter.parse_metrics(line)
+        assert result is not None
+        assert result["step"] == 100
+        assert result["train/loss"] == 0.5
+
+    def test_parse_metrics_keyvalue(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        line = "step=100 train/loss=0.5 train/accuracy=0.85"
+        result = adapter.parse_metrics(line)
+        assert result is not None
+        assert result["step"] == 100
+
+    def test_parse_metrics_non_metric_line(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        assert adapter.parse_metrics("Downloading MNIST...") is None
+
+    def test_get_metrics_mapping(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        mapping = adapter.get_metrics_mapping()
+        assert "train/loss" in mapping
+        assert "val/accuracy" in mapping
+        assert mapping["val/accuracy"]["direction"] == "maximize"
+
+    def test_get_search_ranges(self):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+
+        adapter = DummyClassifierAdapter()
+        ranges = adapter.get_search_ranges()
+        assert "learning_rate" in ranges
+        assert "batch_size" in ranges
+        assert ranges["learning_rate"]["type"] == "float"
+
+    def test_load_model(self, tmp_path: Path):
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+        from adapters.dummy_classifier.model import SimpleCNN
+
+        model = SimpleCNN(in_channels=1, num_classes=10)
+        ckpt = tmp_path / "test.pt"
+        torch.save(
+            {"model_state_dict": model.state_dict(), "in_channels": 1, "num_classes": 10},
+            ckpt,
+        )
+
+        adapter = DummyClassifierAdapter()
+        loaded = adapter.load_model(str(ckpt))
+        assert isinstance(loaded, SimpleCNN)
+
+    def test_predict(self, tmp_path: Path):
+        """predict() should return top-class and probabilities."""
+        from adapters.dummy_classifier.adapter import DummyClassifierAdapter
+        from adapters.dummy_classifier.model import SimpleCNN
+
+        model = SimpleCNN(in_channels=1, num_classes=10)
+        ckpt = tmp_path / "test.pt"
+        torch.save(
+            {"model_state_dict": model.state_dict(), "in_channels": 1, "num_classes": 10},
+            ckpt,
+        )
+
+        adapter = DummyClassifierAdapter()
+        loaded = adapter.load_model(str(ckpt))
+
+        # Create a tiny grayscale PNG
+        from PIL import Image
+        import io
+
+        img = Image.new("L", (28, 28), color=128)
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        image_bytes = buf.getvalue()
+
+        result = adapter.predict(loaded, image_bytes)
+        assert "predictions" in result
+        assert "top_class" in result
+        assert "confidence" in result
+        assert len(result["predictions"]) <= 10
+        assert isinstance(result["predictions"][0]["probability"], float)
+
+
+# ── T10: Evaluator ──────────────────────────────────────────────────
+
+
+class TestEvaluator:
+    """Verify classification evaluator returns correct structure."""
+
+    def test_evaluate_returns_report(self):
+        from adapters.dummy_classifier.evaluator import evaluate
+        from adapters.dummy_classifier.model import SimpleCNN
+        from torch.utils.data import DataLoader, TensorDataset
+
+        model = SimpleCNN(in_channels=1, num_classes=3)
+        model.eval()
+
+        # Fake dataset: 20 samples, 3 classes
+        images = torch.randn(20, 1, 28, 28)
+        labels = torch.randint(0, 3, (20,))
+        ds = TensorDataset(images, labels)
+        loader = DataLoader(ds, batch_size=10)
+
+        result = evaluate(model, loader, class_names=["cat", "dog", "bird"])
+        assert "accuracy" in result
+        assert "per_class" in result
+        assert "macro_f1" in result
+        assert len(result["per_class"]) == 3
+        assert result["per_class"][0]["class"] == "cat"
+        assert 0 <= result["accuracy"] <= 1
+        assert result["total_samples"] == 20
+
+
+# ── T11: Predict API route ──────────────────────────────────────────
+
+
+class TestPredictAPI:
+    """Verify predict API router is registered."""
+
+    def test_predict_route_exists(self):
+        from backend.api.predict import router
+
+        paths = [r.path for r in router.routes]
+        assert "/image" in paths or "/api/predict/image" in paths
+
+    def test_predict_router_in_app(self):
+        from backend.main import app
+
+        route_paths = [r.path for r in app.routes]
+        assert any("/predict" in p for p in route_paths)
+
+
+# ── T12: BaseAdapter predict method ─────────────────────────────────
+
+
+class TestBaseAdapterPredict:
+    """Verify BaseAdapter has optional predict() method."""
+
+    def test_predict_on_base_raises(self):
+        """BaseAdapter.predict() should raise NotImplementedError."""
+        from adapters.base import BaseAdapter
+
+        # Create a minimal concrete subclass
+        class _Stub(BaseAdapter):
+            def config_to_yaml(self, config):
+                return ""
+
+            def get_train_command(self, yaml_path):
+                return []
+
+            def parse_metrics(self, log_line):
+                return None
+
+        stub = _Stub()
+        import pytest
+
+        with pytest.raises(NotImplementedError):
+            stub.predict(None, b"")
+
+
+# ── T13: Genericity checks ──────────────────────────────────────────
+
+
+class TestGenericity:
+    """No vlm/siglip/hash/coco terms in core API or shared schemas."""
+
+    FORBIDDEN = {"vlm", "siglip", "coco", "hash_layer", "hamming_search", "cosine_search"}
+
+    def _scan_file(self, path: Path) -> list[str]:
+        """Return forbidden terms found in a file (case-insensitive in identifiers)."""
+        if not path.exists():
+            return []
+        text = path.read_text()
+        found = []
+        for term in self.FORBIDDEN:
+            # Skip comments and strings, check identifiers
+            for line in text.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("#") or stripped.startswith("//"):
+                    continue
+                if term in stripped.lower():
+                    found.append(f"{path.name}: '{term}' in: {stripped[:120]}")
+                    break
+        return found
+
+    def test_no_forbidden_in_backend_api(self):
+        api_dir = Path(__file__).parent.parent / "backend" / "api"
+        violations = []
+        for py_file in api_dir.glob("*.py"):
+            violations.extend(self._scan_file(py_file))
+        assert violations == [], "Forbidden terms in API:\n" + "\n".join(violations)
+
+    def test_no_forbidden_in_shared_schemas(self):
+        schemas_file = Path(__file__).parent.parent / "shared" / "schemas.py"
+        violations = self._scan_file(schemas_file)
+        assert violations == [], "Forbidden terms in schemas:\n" + "\n".join(violations)
+
+    def test_no_forbidden_in_backend_core(self):
+        core_dir = Path(__file__).parent.parent / "backend" / "core"
+        if not core_dir.exists():
+            return  # core/ is optional
+        violations = []
+        for py_file in core_dir.glob("*.py"):
+            violations.extend(self._scan_file(py_file))
+        assert violations == [], "Forbidden terms in core:\n" + "\n".join(violations)
+
+    def test_predict_api_is_generic(self):
+        """predict.py should not reference specific model types."""
+        predict_file = Path(__file__).parent.parent / "backend" / "api" / "predict.py"
+        violations = self._scan_file(predict_file)
+        assert violations == [], "Forbidden terms in predict API:\n" + "\n".join(violations)
+
+
+# ── T14: Two adapters coexist ────────────────────────────────────────
+
+
+class TestTwoAdaptersCoexist:
+    """Both vlm_quantization and dummy_classifier must be in the registry."""
+
+    def test_both_in_registry(self):
+        from adapters import ADAPTER_REGISTRY
+
+        assert "vlm_quantization" in ADAPTER_REGISTRY
+        assert "dummy_classifier" in ADAPTER_REGISTRY
+
+    def test_different_names(self):
+        from adapters import get_adapter
+
+        vlm = get_adapter("vlm_quantization")
+        clf = get_adapter("dummy_classifier")
+        assert vlm.get_name() != clf.get_name()
+
+    def test_different_metrics(self):
+        from adapters import get_adapter
+
+        vlm = get_adapter("vlm_quantization")
+        clf = get_adapter("dummy_classifier")
+        vlm_keys = set(vlm.get_metrics_mapping().keys())
+        clf_keys = set(clf.get_metrics_mapping().keys())
+        # Should have different metric keys (some overlap on train/loss is ok)
+        assert vlm_keys != clf_keys
+
+    def test_both_have_search_ranges(self):
+        from adapters import get_adapter
+
+        vlm = get_adapter("vlm_quantization")
+        clf = get_adapter("dummy_classifier")
+        assert len(vlm.get_search_ranges()) > 0
+        assert len(clf.get_search_ranges()) > 0

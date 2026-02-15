@@ -1,6 +1,7 @@
 """ML framework adapters for experiment execution."""
 
 from adapters.base import BaseAdapter
+from adapters.dummy_classifier.adapter import DummyClassifierAdapter
 from adapters.huggingface import HuggingFaceAdapter
 from adapters.pytorch_lightning import PyTorchLightningAdapter
 from adapters.vlm_quantization.adapter import VLMQuantizationAdapter
@@ -10,6 +11,7 @@ ADAPTER_REGISTRY: dict[str, type[BaseAdapter]] = {
     "pytorch_lightning": PyTorchLightningAdapter,
     "huggingface": HuggingFaceAdapter,
     "vlm_quantization": VLMQuantizationAdapter,
+    "dummy_classifier": DummyClassifierAdapter,
 }
 
 
@@ -34,6 +36,7 @@ def get_adapter(framework: str) -> BaseAdapter:
 
 __all__ = [
     "BaseAdapter",
+    "DummyClassifierAdapter",
     "HuggingFaceAdapter",
     "PyTorchLightningAdapter",
     "VLMQuantizationAdapter",

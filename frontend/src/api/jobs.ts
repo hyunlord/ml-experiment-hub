@@ -91,6 +91,7 @@ export const searchByText = async (params: {
   bit_length?: number
   top_k?: number
   method?: string
+  adapter_name?: string
 }): Promise<SearchResponse> => {
   const formData = new FormData()
   formData.append('query', params.query)
@@ -99,6 +100,7 @@ export const searchByText = async (params: {
   formData.append('bit_length', String(params.bit_length ?? 64))
   formData.append('top_k', String(params.top_k ?? 20))
   formData.append('method', params.method ?? 'hamming')
+  formData.append('adapter_name', params.adapter_name ?? 'vlm_quantization')
 
   const response = await client.post('/search/text', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -113,6 +115,7 @@ export const searchByImage = async (params: {
   bit_length?: number
   top_k?: number
   method?: string
+  adapter_name?: string
 }): Promise<SearchResponse> => {
   const formData = new FormData()
   formData.append('image', params.image)
@@ -121,6 +124,7 @@ export const searchByImage = async (params: {
   formData.append('bit_length', String(params.bit_length ?? 64))
   formData.append('top_k', String(params.top_k ?? 20))
   formData.append('method', params.method ?? 'hamming')
+  formData.append('adapter_name', params.adapter_name ?? 'vlm_quantization')
 
   const response = await client.post('/search/image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

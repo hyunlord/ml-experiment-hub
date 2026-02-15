@@ -53,7 +53,7 @@ async def search_by_text(
     bit_length: int = Form(default=64),
     top_k: int = Form(default=20),
     method: str = Form(default="hamming"),
-    adapter_name: str = Form(default="vlm_quantization"),
+    adapter_name: str = Form(...),
 ) -> dict[str, Any]:
     """Text-to-image search: find similar images for a text query.
 
@@ -64,7 +64,7 @@ async def search_by_text(
         bit_length: Bit length for code comparison.
         top_k: Number of results to return.
         method: Search method ('hamming' or 'cosine').
-        adapter_name: Adapter to use for search (default: vlm_quantization).
+        adapter_name: Adapter to use for search.
 
     Returns:
         Search results with thumbnails and scores.
@@ -100,7 +100,7 @@ async def search_by_image(
     bit_length: int = Form(default=64),
     top_k: int = Form(default=20),
     method: str = Form(default="hamming"),
-    adapter_name: str = Form(default="vlm_quantization"),
+    adapter_name: str = Form(...),
 ) -> dict[str, Any]:
     """Image-to-text search: find similar texts for an image query.
 
@@ -111,7 +111,7 @@ async def search_by_image(
         bit_length: Bit length for code comparison.
         top_k: Number of results to return.
         method: Search method ('hamming' or 'cosine').
-        adapter_name: Adapter to use for search (default: vlm_quantization).
+        adapter_name: Adapter to use for search.
 
     Returns:
         Search results with captions and scores.
