@@ -22,6 +22,11 @@ interface ExperimentData {
   id: number
   name: string
   config: Record<string, unknown>
+  project_name: string | null
+  project_git_commit: string | null
+  project_git_branch: string | null
+  project_git_dirty: boolean
+  project_git_url: string | null
 }
 
 interface MetricPoint {
@@ -126,6 +131,11 @@ export default function ExperimentComparePage() {
             id: raw.id as number,
             name: raw.name as string,
             config: (raw.config ?? raw.hyperparameters ?? {}) as Record<string, unknown>,
+            project_name: (raw.project_name as string) ?? null,
+            project_git_commit: (raw.project_git_commit as string) ?? null,
+            project_git_branch: (raw.project_git_branch as string) ?? null,
+            project_git_dirty: (raw.project_git_dirty as boolean) ?? false,
+            project_git_url: (raw.project_git_url as string) ?? null,
           }
           exps.push(exp)
           mMap.set(exp.id, r.value.metrics)
@@ -318,6 +328,60 @@ export default function ExperimentComparePage() {
           </p>
         </div>
       </div>
+
+      {/* Code version warning */}
+      {(() => {
+        const commits = experiments
+          .map((e) => e.project_git_commit)
+          .filter(Boolean)
+        const uniqueCommits = new Set(commits)
+        if (uniqueCommits.size > 1) {
+          // Build GitHub compare link if possible
+          const gitUrl = experiments.find((e) => e.project_git_url)?.project_git_url?.replace(/\.git$/, '')
+          const commitList = Array.from(uniqueCommits)
+          const compareUrl = gitUrl && commitList.length === 2
+            ? `${gitUrl}/compare/${commitList[0]}...${commitList[1]}`
+            : null
+
+          return (
+            <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-3">
+              <p className="text-sm font-medium text-orange-400">
+                These experiments were run on different code versions
+              </p>
+              <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                {experiments.map((e) => (
+                  <span key={e.id} className="font-mono">
+                    #{e.id}: {e.project_git_branch ?? '?'}@{e.project_git_commit?.slice(0, 7) ?? '?'}
+                    {e.project_git_dirty && <span className="ml-0.5 text-orange-500">*</span>}
+                  </span>
+                ))}
+              </div>
+              {compareUrl && (
+                <a
+                  href={compareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 inline-block text-xs text-primary hover:underline"
+                >
+                  View code diff
+                </a>
+              )}
+            </div>
+          )
+        }
+        // Warn about dirty experiments
+        const dirtyExps = experiments.filter((e) => e.project_git_dirty)
+        if (dirtyExps.length > 0) {
+          return (
+            <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 px-4 py-3">
+              <p className="text-sm text-orange-400">
+                {dirtyExps.length === experiments.length ? 'All' : 'Some'} experiments had uncommitted changes at creation time
+              </p>
+            </div>
+          )
+        }
+        return null
+      })()}
 
       {/* ================================================================ */}
       {/* Config Comparison Table                                          */}

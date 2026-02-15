@@ -147,6 +147,10 @@ class ExperimentConfig(SQLModel, table=True):
     Users can add any fields they need (backbone, batch_size, learning_rate, etc.)
     without being constrained to a fixed schema. Optionally link to a ConfigSchema
     for form generation and validation.
+
+    Project snapshot fields capture the project's git state at experiment creation
+    time for reproducibility. Even if the project changes later, the snapshot
+    preserves the exact code version used.
     """
 
     __tablename__ = "experiment_configs"
@@ -161,6 +165,21 @@ class ExperimentConfig(SQLModel, table=True):
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # ── Project snapshot (captured at experiment creation) ────────────
+    project_name: str | None = Field(default=None, description="Project name at creation time")
+    project_git_url: str | None = Field(default=None, description="Git remote URL")
+    project_git_branch: str | None = Field(default=None, description="Git branch at creation time")
+    project_git_commit: str | None = Field(
+        default=None, description="Git commit hash at creation time"
+    )
+    project_git_message: str | None = Field(default=None, description="Commit message")
+    project_git_dirty: bool = Field(
+        default=False, description="Had uncommitted changes at creation"
+    )
+    project_python_env: str | None = Field(
+        default=None, description="Python env type: uv, conda, etc."
+    )
 
     # Relationships
     config_schema: ConfigSchema | None = Relationship(back_populates="experiment_configs")

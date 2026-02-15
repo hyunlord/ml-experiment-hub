@@ -140,6 +140,76 @@ export default function ExperimentDetailPage() {
           )}
         </div>
 
+        {/* Project Snapshot */}
+        {selectedExperiment.project_name && (
+          <div className="mt-4 rounded-md border border-border bg-secondary/30 p-4">
+            <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+              Project Snapshot
+            </h3>
+            <div className="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <span className="text-muted-foreground">Project: </span>
+                <button
+                  onClick={() => {
+                    if (selectedExperiment.project_id)
+                      navigate(`/projects/${selectedExperiment.project_id}`)
+                  }}
+                  className="font-medium text-primary hover:underline"
+                >
+                  {selectedExperiment.project_name}
+                </button>
+              </div>
+              {selectedExperiment.project_git_branch && (
+                <div>
+                  <span className="text-muted-foreground">Git: </span>
+                  <span className="font-mono text-card-foreground">
+                    {selectedExperiment.project_git_branch}
+                    {selectedExperiment.project_git_commit && (
+                      <>
+                        {' @ '}
+                        {selectedExperiment.project_git_url ? (
+                          <a
+                            href={`${selectedExperiment.project_git_url.replace(/\.git$/, '')}/commit/${selectedExperiment.project_git_commit}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {selectedExperiment.project_git_commit.slice(0, 7)}
+                          </a>
+                        ) : (
+                          <span>{selectedExperiment.project_git_commit.slice(0, 7)}</span>
+                        )}
+                      </>
+                    )}
+                  </span>
+                  {selectedExperiment.project_git_message && (
+                    <span className="ml-2 text-muted-foreground">
+                      ("{selectedExperiment.project_git_message}")
+                    </span>
+                  )}
+                </div>
+              )}
+              <div>
+                <span className="text-muted-foreground">Status: </span>
+                {selectedExperiment.project_git_dirty ? (
+                  <span className="text-orange-500">
+                    Dirty (uncommitted changes at creation)
+                  </span>
+                ) : (
+                  <span className="text-green-500">Clean</span>
+                )}
+              </div>
+              {selectedExperiment.project_python_env && (
+                <div>
+                  <span className="text-muted-foreground">Env: </span>
+                  <span className="text-card-foreground">{selectedExperiment.project_python_env}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4">
           <h3 className="mb-2 text-sm font-medium text-muted-foreground">
             Configuration

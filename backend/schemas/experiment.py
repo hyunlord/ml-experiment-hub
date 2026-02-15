@@ -43,6 +43,14 @@ class ExperimentResponse(TimezoneAwareResponse):
     tags: list[str]
     created_at: datetime
     updated_at: datetime
+    # Project snapshot fields
+    project_name: str | None = None
+    project_git_url: str | None = None
+    project_git_branch: str | None = None
+    project_git_commit: str | None = None
+    project_git_message: str | None = None
+    project_git_dirty: bool = False
+    project_python_env: str | None = None
 
     @classmethod
     def from_model(cls, model: Any) -> "ExperimentResponse":
@@ -58,6 +66,13 @@ class ExperimentResponse(TimezoneAwareResponse):
             tags=model.tags,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            project_name=model.project_name,
+            project_git_url=model.project_git_url,
+            project_git_branch=model.project_git_branch,
+            project_git_commit=model.project_git_commit,
+            project_git_message=model.project_git_message,
+            project_git_dirty=model.project_git_dirty,
+            project_python_env=model.project_python_env,
         )
 
 
@@ -160,6 +175,10 @@ class CompareExperimentEntry(BaseModel):
     config: dict[str, Any]
     metrics_summary: dict[str, Any] | None
     status: str
+    project_name: str | None = None
+    project_git_commit: str | None = None
+    project_git_branch: str | None = None
+    project_git_dirty: bool = False
 
 
 class CompareResponse(BaseModel):
