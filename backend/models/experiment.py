@@ -200,7 +200,7 @@ class OptunaStudy(SQLModel, table=True):
     search_epochs: int = Field(default=5, ge=1, description="Epochs per trial")
     subset_ratio: float = Field(default=0.1, ge=0.01, le=1.0)
     pruner: str = Field(default="median", description="Optuna pruner: median|hyperband|none")
-    objective_metric: str = Field(default="val/map_i2t", description="Metric to optimize")
+    objective_metric: str = Field(default="val/loss", description="Metric to optimize")
     direction: str = Field(default="maximize", description="maximize or minimize")
     status: JobStatus = Field(default=JobStatus.PENDING)
     best_trial_number: int | None = Field(default=None)

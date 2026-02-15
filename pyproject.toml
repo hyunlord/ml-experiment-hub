@@ -38,6 +38,7 @@ warn_unused_configs = true
 
 [project.optional-dependencies]
 dev = ["ruff","mypy","pytest"]
+optuna = ["optuna>=3.0.0"]
 
 [tool.ruff]
 line-length = 100

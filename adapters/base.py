@@ -64,6 +64,23 @@ class BaseAdapter(ABC):
         return {}
 
     # ------------------------------------------------------------------
+    # Optional: hyperparameter search ranges
+    # Override to provide recommended search ranges for the UI.
+    # ------------------------------------------------------------------
+
+    def get_search_ranges(self) -> dict[str, dict[str, Any]]:
+        """Return recommended search ranges for hyperparameter search.
+
+        Override to suggest default min/max/type for searchable parameters.
+        The UI uses this to pre-fill the search space editor.
+
+        Returns:
+            Dict mapping param key to {type, low, high, log, ...}.
+            Example: {"lr": {"type": "float", "low": 1e-5, "high": 1e-2, "log": True}}
+        """
+        return {}
+
+    # ------------------------------------------------------------------
     # Optional: search / index / eval capabilities
     # Override in adapter subclasses that support these features.
     # ------------------------------------------------------------------
