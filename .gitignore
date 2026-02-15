@@ -90,3 +90,40 @@ checkpoints/
 outputs/
 mlruns/
 wandb/
+
+# Docker
+docker-compose.override.yml
+
+# Data directories (DB, uploads, projects store)
+data/
+projects/
+
+# Alembic (마이그레이션 파일은 유지, 자동생성 임시파일만 제외)
+# alembic/versions/ 는 커밋해야 함!
+
+# Uploaded files
+uploads/
+
+# Thumbnails / cached images
+thumbnails/
+.cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Ruff / linter cache
+.ruff_cache/
+
+# Coverage reports
+coverage.xml
+junit.xml
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Secrets (토큰, 키 등)
+*.pem
+*.key
+secrets/

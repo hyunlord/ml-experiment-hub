@@ -67,7 +67,10 @@ COPY alembic.ini ./
 # Install project itself, then add gunicorn (must be after sync)
 RUN uv sync --frozen --no-dev && uv pip install gunicorn
 
+# Copy entrypoint script
+COPY backend/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 8002
 
-# gunicorn with uvicorn workers for async support
-CMD ["sh", "-c", "uv run alembic upgrade head && uv run gunicorn backend.main:app --bind 0.0.0.0:8002 --worker-class uvicorn.workers.UvicornWorker --workers 1 --timeout 300 --graceful-timeout 30 --access-logfile - --error-logfile - --log-level info"]
+ENTRYPOINT ["/app/entrypoint.sh"]
