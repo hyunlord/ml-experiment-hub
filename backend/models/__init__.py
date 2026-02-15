@@ -5,6 +5,7 @@ from backend.models.experiment import (
     ExperimentConfig,
     ExperimentRun,
     MetricLog,
+    Project,
     SystemStats,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "ExperimentConfig",
     "ExperimentRun",
     "MetricLog",
+    "Project",
     "SystemStats",
 ]

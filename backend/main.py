@@ -13,6 +13,7 @@ from backend.api import (
     jobs,
     metrics,
     predict,
+    projects,
     queue,
     runs,
     schemas,
@@ -210,6 +211,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(projects.router)
 app.include_router(experiments.router)
 app.include_router(schemas.router)
 app.include_router(metrics.router)

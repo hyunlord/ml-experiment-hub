@@ -21,6 +21,7 @@ export interface Experiment {
   status: ExperimentStatus
   config: Record<string, unknown>
   schema_id: number | null
+  project_id: number | null
   tags: string[]
   created_at: string
   updated_at: string

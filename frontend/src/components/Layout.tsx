@@ -8,6 +8,7 @@ import {
   Cpu,
   Database,
   FlaskConical,
+  FolderGit2,
   Home,
   ListOrdered,
   Moon,
@@ -52,6 +53,11 @@ function useNavItems(): NavItem[] {
       label: 'Dashboard',
       icon: <Home className="h-5 w-5" />,
       end: true,
+    },
+    {
+      to: '/projects',
+      label: 'Projects',
+      icon: <FolderGit2 className="h-5 w-5" />,
     },
     {
       to: '/experiments',
@@ -202,6 +208,9 @@ function TopBar() {
   const title = (() => {
     const path = location.pathname
     if (path === '/') return 'Dashboard'
+    if (path === '/projects') return 'Projects'
+    if (path === '/projects/new') return 'Register Project'
+    if (path.startsWith('/projects/')) return 'Project Detail'
     if (path === '/experiments') return 'Experiments'
     if (path === '/experiments/new') return 'New Experiment'
     if (path.startsWith('/experiments/') && path.endsWith('/edit'))

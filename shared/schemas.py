@@ -94,6 +94,15 @@ class QueueStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class ProjectStatus(str, Enum):
+    """Status of a registered project."""
+
+    REGISTERED = "registered"
+    SCANNING = "scanning"
+    READY = "ready"
+    ERROR = "error"
+
+
 class JobStatus(str, Enum):
     """Status of a background job."""
 

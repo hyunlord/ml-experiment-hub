@@ -12,11 +12,69 @@ from shared.schemas import (
     ExperimentConfigStatus,
     JobStatus,
     JobType,
+    ProjectStatus,
     QueueStatus,
     RunStatus,
     SplitMethod,
     TrialStatus,
 )
+
+
+class Project(SQLModel, table=True):
+    """Registered ML project.
+
+    Represents a user's ML project directory on the server.
+    Projects contain config files, training scripts, and checkpoints.
+    Experiments are always linked to a project.
+    """
+
+    __tablename__ = "projects"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(index=True, description="Display name")
+    path: str = Field(description="Absolute path to project directory on server")
+    git_url: str | None = Field(default=None, description="Git remote URL")
+    description: str = Field(default="")
+    project_type: str = Field(
+        default="custom",
+        description="Framework type: pytorch-lightning, huggingface, custom",
+    )
+    train_command_template: str = Field(
+        default="python train.py --config {config_path}",
+        description="Command template for training",
+    )
+    eval_command_template: str | None = Field(
+        default=None,
+        description="Command template for evaluation",
+    )
+    config_dir: str = Field(default="configs/", description="Relative path to config directory")
+    config_format: str = Field(default="yaml", description="Config file format: yaml, json, toml")
+    checkpoint_dir: str = Field(default="checkpoints/", description="Relative path to checkpoints")
+    python_env: str = Field(
+        default="system",
+        description="Python env type: uv, venv, conda, system",
+    )
+    env_path: str | None = Field(
+        default=None,
+        description="Path to venv or conda env name",
+    )
+    status: ProjectStatus = Field(default=ProjectStatus.REGISTERED)
+    detected_configs: list[dict[str, Any]] = Field(
+        default_factory=list,
+        sa_column=Column(JSON),
+        description="Auto-scanned config files",
+    )
+    detected_scripts: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON),
+        description="Auto-scanned train/eval/other scripts",
+    )
+    tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    experiments: list["ExperimentConfig"] = Relationship(back_populates="project")
 
 
 class ConfigSchema(SQLModel, table=True):
@@ -64,6 +122,7 @@ class ExperimentConfig(SQLModel, table=True):
     description: str = Field(default="")
     config_json: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
     config_schema_id: int | None = Field(default=None, foreign_key="config_schemas.id")
+    project_id: int | None = Field(default=None, foreign_key="projects.id", index=True)
     status: ExperimentConfigStatus = Field(default=ExperimentConfigStatus.DRAFT)
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON))
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -71,6 +130,7 @@ class ExperimentConfig(SQLModel, table=True):
 
     # Relationships
     config_schema: ConfigSchema | None = Relationship(back_populates="experiment_configs")
+    project: Project | None = Relationship(back_populates="experiments")
     runs: list["ExperimentRun"] = Relationship(back_populates="experiment_config")
 
 
