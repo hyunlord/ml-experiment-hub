@@ -21,6 +21,7 @@ export interface QueueEntry {
 
 export interface HubSettings {
   discord_webhook_url: string
+  slack_webhook_url: string
   max_concurrent_runs: number
 }
 
@@ -68,5 +69,12 @@ export async function updateSettings(
   updates: Partial<HubSettings>
 ): Promise<HubSettings> {
   const { data } = await API.put('/api/settings', updates)
+  return data
+}
+
+export async function testWebhook(
+  provider: 'discord' | 'slack'
+): Promise<{ ok: boolean; error?: string }> {
+  const { data } = await API.post('/api/settings/test-webhook', { provider })
   return data
 }
