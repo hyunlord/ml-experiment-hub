@@ -22,7 +22,7 @@ services:
       - /tmp/ml-hub-configs:/tmp/configs           # Generated config YAMLs
       - hub-venvs:/data/venvs                     # Per-project Python venvs
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:////data/ml_hub.db
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/ml_hub.db
       - PROJECTS_STORE_DIR=/app/projects
       - PROJECTS_DIR=/projects
       - DATA_DIR=/ml-data

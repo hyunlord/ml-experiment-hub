@@ -7,7 +7,7 @@
 echo "=== ML Experiment Hub Backend ==="
 
 # Create data directories if they don't exist
-mkdir -p /data/logs /data/venvs /tmp/configs
+mkdir -p /app/data /data/logs /data/venvs /tmp/configs
 
 # Run Alembic migrations (non-fatal: server starts even if migration fails)
 echo "Running database migrations..."
