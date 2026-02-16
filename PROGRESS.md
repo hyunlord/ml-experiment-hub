@@ -165,3 +165,75 @@ Generic search adapter registry, Optuna search engine.
 
 ### M7: Adapter Plugin System
 Generic model adapter registry, dummy_classifier reference adapter, adapter guide.
+
+---
+
+## DB Path Unification Fix — 2026-02-16
+
+### Context
+Fix database path mismatch where alembic creates DB at `/app/ml_experiments.db` (with migrations) but the app uses `/data/ml_hub.db` (without migrations), causing 500 errors. Unify all DB path references to `/app/data/ml_hub.db`.
+
+### Root Cause Analysis
+- **Alembic**: Reads from `alembic.ini` → `sqlite+aiosqlite:///./ml_experiments.db` → creates `/app/ml_experiments.db`
+- **Backend app**: Reads from `docker-compose.yml` env var → `sqlite+aiosqlite:////data/ml_hub.db` → uses `/data/ml_hub.db`
+- **alembic/env.py**: Currently reads from alembic.ini, does NOT read from backend.config.settings
+- Result: Two different databases, app uses the one without migrations
+
+### Tickets
+| Ticket | Title | Action | Dispatch Tool | Reason |
+|--------|-------|--------|---------------|--------|
+| t-001 | Unify DB path configuration | 🔴 DIRECT | — | Atomic config change across 6 files; infrastructure wiring |
+
+### Dispatch ratio: 0/1 = 0% (Infrastructure fix, all DIRECT)
+
+### Dispatch strategy
+N/A — Single atomic configuration change
+
+### Implementation Plan
+1. **backend/config.py**: Change default to `sqlite+aiosqlite:///./data/ml_hub.db`
+2. **alembic.ini**: Change to placeholder (will be overridden by env.py)
+3. **alembic/env.py**: Read DATABASE_URL from backend.config.settings
+4. **docker-compose.yml**: Change to `DATABASE_URL=sqlite+aiosqlite:////app/data/ml_hub.db`
+5. **backend/entrypoint.sh**: Add `mkdir -p /app/data` before migrations
+6. **backend/Dockerfile**: Add `/app/data` to RUN mkdir command
+
+### Files Modified
+- backend/config.py — Changed default to `sqlite+aiosqlite:///./data/ml_hub.db`
+- alembic.ini — Changed to placeholder (will be overridden by env.py)
+- alembic/env.py — Added backend.config import, set sqlalchemy.url from settings.DATABASE_URL
+- docker-compose.yml — Changed to `DATABASE_URL=sqlite+aiosqlite:////app/data/ml_hub.db`
+- backend/entrypoint.sh — Added `mkdir -p /app/data`
+- backend/Dockerfile — Added `/app/data` to RUN mkdir command
+
+### Gate Results
+- ✅ 258 tests passed, 1 skipped
+- ✅ Lint/format clean (96 files formatted)
+- ✅ Mypy errors are pre-existing (yaml/psutil stubs - expected)
+- ✅ Smoke test passed
+
+### Docker Verification Steps
+After rebuilding containers, verify the fix:
+```bash
+# 1. Clean up old containers and volumes
+docker compose down -v
+
+# 2. Rebuild and start
+docker compose up -d --build
+
+# 3. Verify DB created at correct path with migrations
+docker compose exec backend python -c "
+import sqlite3
+conn = sqlite3.connect('/app/data/ml_hub.db')
+cols = conn.execute('PRAGMA table_info(experiment_configs)').fetchall()
+print('Columns:', [c[1] for c in cols])
+print('project_name present:', 'project_name' in [c[1] for c in cols])
+conn.close()
+"
+
+# 4. Test API endpoint
+curl http://localhost:8002/api/experiments
+# Should return 200, not 500
+```
+
+### Summary
+All database path references unified to `/app/data/ml_hub.db`. Both alembic migrations and the backend app now use the same database path through environment variable configuration. The alembic.ini placeholder is overridden by alembic/env.py reading from backend.config.settings, ensuring a single source of truth.

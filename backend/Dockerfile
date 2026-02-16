@@ -27,7 +27,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 # Create runtime directories
-RUN mkdir -p /data/logs /data/venvs /tmp/configs
+RUN mkdir -p /app/data /data/logs /data/venvs /tmp/configs
 
 # ---------------------------------------------------------------------------
 # Stage: dev - Development with hot reload

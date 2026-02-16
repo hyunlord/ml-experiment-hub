@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings."""
 
-    DATABASE_URL: str = "sqlite+aiosqlite:///./ml_experiments.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/ml_hub.db"
     CORS_ORIGINS: list[str] = ["*"]
     LOG_LEVEL: str = "INFO"
     EXPERIMENT_DIR: str = "./experiments"
