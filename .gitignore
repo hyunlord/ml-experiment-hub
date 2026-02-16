@@ -1,5 +1,6 @@
 # OMC state
 .omc/
+.omx/
 
 # Python
 __pycache__/
