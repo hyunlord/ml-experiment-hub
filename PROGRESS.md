@@ -170,6 +170,8 @@ Generic model adapter registry, dummy_classifier reference adapter, adapter guid
 
 ## DB Path Unification Fix — 2026-02-16
 
+### Status: ✅ COMPLETE
+
 ### Context
 Fix database path mismatch where alembic creates DB at `/app/ml_experiments.db` (with migrations) but the app uses `/data/ml_hub.db` (without migrations), causing 500 errors. Unify all DB path references to `/app/data/ml_hub.db`.
 
